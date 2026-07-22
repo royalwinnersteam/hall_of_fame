@@ -740,7 +740,7 @@
 
   // ---- Step 0: photo picker -> switches straight into the crop subview ----
   let rawImage = null // HTMLImageElement of the originally chosen file
-  const MAX_PHOTO_BYTES = 100 * 1024 // 100 KB
+  const MAX_PHOTO_BYTES = 500 * 1024 // 500 KB
   hofPhotoInput.addEventListener('change', () => {
     const file = hofPhotoInput.files[0]
     if (!file) return
