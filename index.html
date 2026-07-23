@@ -670,7 +670,7 @@
   })
   nftInput.addEventListener('input', () => {
     if (activeBoard === 'ts') {
-      nftInput.value = nftInput.value.replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 10)
+      nftInput.value = nftInput.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 10)
     } else {
       nftInput.value = nftInput.value.replace(/\D/g, '').slice(0, 5)
     }
