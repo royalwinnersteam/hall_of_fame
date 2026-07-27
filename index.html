@@ -413,7 +413,9 @@
   const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30 }
   function levelsFor(board) {
     const n = BOARD_LEVEL_COUNTS[board]
-    return Array.from({ length: n }, (_, i) => n - i) // highest down to 1
+    const levels = Array.from({ length: n }, (_, i) => n - i) // highest down to 1
+    if (isDirectBoard(board)) levels.push(0) // Direct boards also have a "0 Direct" level, shown last
+    return levels
   }
   // "Direct" boards use the same identifier format as their parent board
   // (vboost_direct -> 5-digit Passport NFT, ts_direct -> 10-char Link ID),
