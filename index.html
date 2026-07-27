@@ -33,12 +33,12 @@
   /* Full-bleed app shell — fills the viewport instead of sitting in a narrow column */
   .app { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 56px) 80px; }
 
-  .header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-bottom: 28px; }
+  .header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; margin-bottom: 28px; }
   .header-brand-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; grid-column: 1; justify-self: start; }
   .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-right{ grid-column: 3; justify-self: end; align-self: start; }
+  .header-right{ grid-column: 3; justify-self: end; align-self: start; min-width: 0; max-width: 100%; }
   .royal-logo {
-    height: 150px; width: auto; flex-shrink: 0; display: block;
+    height: auto; width: auto; max-height: 150px; max-width: 100%; flex-shrink: 0; display: block;
     object-fit: contain; background: transparent;
     filter: drop-shadow(0 4px 10px rgba(232, 182, 90, 0.35));
   }
@@ -79,6 +79,8 @@
     .header-brand-col { grid-column: 1; justify-self: center; align-items: center; }
     .site-title-wrap { grid-column: 1; order: -1; }
     .site-title, .super-title { white-space: normal; }
+    .header-right { grid-column: 1; justify-self: center; align-self: center; max-width: 100%; }
+    .royal-logo { height: auto; width: 130px; max-width: 60%; }
   }
   .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
 
@@ -104,7 +106,9 @@
   .level-list { display: flex; flex-direction: column; }
   .level-row { display: flex; align-items: center; gap: 20px; padding: 20px 4px; border-bottom: 1px solid var(--line); }
   .level-row:last-child { border-bottom: none; }
-  .level-tag { font-family: var(--font-display); font-size: 20px; color: var(--gold); width: 120px; flex-shrink: 0; line-height: 1; }
+  .level-tag { display: flex; flex-direction: column; gap: 2px; width: 120px; flex-shrink: 0; line-height: 1.15; }
+  .level-tag-board { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .level-tag-level { font-family: var(--font-display); font-size: 20px; color: var(--gold); }
 
   /* ---- Photo row: 1-4 photos are static, evenly spread & centered; 5+ spin in a loop ---- */
   .carousel-wrap { flex: 1; min-width: 0; overflow: hidden; }
@@ -119,6 +123,8 @@
   }
   .photo-track--static { justify-content: space-evenly; width: 100%; }
   .photo-track--marquee { will-change: transform; }
+  .photo-carousel.draggable { cursor: grab; user-select: none; }
+  .photo-carousel.draggable.dragging { cursor: grabbing; }
   .photo-card {
     flex: 0 0 auto; width: var(--card-size);
     display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -423,7 +429,9 @@
   function isDirectBoard(board) { return board === 'vboost_direct' || board === 'ts_direct' }
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
   function levelTagLabel(board, level) {
-    return isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+    const boardName = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    const line2 = isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+    return `<span class="level-tag-board">${boardName}</span><span class="level-tag-level">${line2}</span>`
   }
   const VISIBLE_SLOTS = 5 // photos are sized so exactly this many fill the row, centered between the level and the + button
   const CARD_GAP = 14 // px between photos — must match the .photo-carousel CSS gap
@@ -490,7 +498,7 @@
       if (!membersByLevel[row.level]) membersByLevel[row.level] = []
       membersByLevel[row.level].push(row)
     }
-    headerSub.textContent = `${BOARD_LABELS[currentBoard]} ${LEVELS.length}`
+    headerSub.textContent = `${BOARD_LABELS[currentBoard]} — ${LEVELS.length} levels`
 
     levelListEl.innerHTML = ''
     for (const level of LEVELS) {
@@ -606,22 +614,98 @@
     carousel.addEventListener('mouseenter', onEnter)
     carousel.addEventListener('mouseleave', onLeave)
 
-    // Only a horizontal scroll (trackpad two-finger swipe left/right) spins the loop —
-    // and only for 5+ photos. With 1-4 photos it still auto-spins, but scrolling over
-    // it does nothing special, so the page keeps scrolling normally either direction.
+    // Horizontal gestures spin the loop — trackpad two-finger swipe left/right, or
+    // holding Shift while using a plain mouse wheel (the standard "make this wheel
+    // horizontal" convention). A normal up/down scroll is left alone so the page
+    // keeps scrolling vertically like anywhere else. Only for 5+ photos.
     let onWheel = null
+    // Touch swipe — same idea as the wheel handler above, but for mobile where there's
+    // no hover/wheel. A horizontal drag moves the track directly; the marquee just
+    // keeps drifting from wherever the finger leaves it.
+    let onTouchStart = null, onTouchMove = null, onTouchEnd = null
     if (count >= VISIBLE_SLOTS) {
       onWheel = (e) => {
-        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return // vertical — let the page scroll
+        let delta
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) delta = e.deltaX // trackpad horizontal swipe
+        else if (e.shiftKey) delta = e.deltaY // Shift + mouse wheel -> horizontal
+        else return // plain vertical scroll — let the page scroll normally
         e.preventDefault()
         const half = halfWidth()
         if (half > 0) {
-          offset += e.deltaX
+          offset += delta
           offset = ((offset % half) + half) % half // wrap both directions, stays in [0, half)
           track.style.transform = `translateX(${-offset}px)`
         }
       }
       carousel.addEventListener('wheel', onWheel, { passive: false })
+
+      let touchStartX = 0, touchStartY = 0, touchStartOffset = 0, dragging = false, isHorizontal = null
+      onTouchStart = (e) => {
+        const t = e.touches[0]
+        touchStartX = t.clientX
+        touchStartY = t.clientY
+        touchStartOffset = offset
+        dragging = true
+        isHorizontal = null
+        paused = true
+      }
+      onTouchMove = (e) => {
+        if (!dragging) return
+        const t = e.touches[0]
+        const dx = touchStartX - t.clientX
+        const dy = touchStartY - t.clientY
+        if (isHorizontal === null) isHorizontal = Math.abs(dx) > Math.abs(dy)
+        if (!isHorizontal) return // vertical swipe — let the page scroll normally
+        e.preventDefault()
+        const half = halfWidth()
+        if (half > 0) {
+          offset = ((touchStartOffset + dx) % half + half) % half
+          track.style.transform = `translateX(${-offset}px)`
+        }
+      }
+      onTouchEnd = () => {
+        dragging = false
+        paused = false // hand it back to the drift once released
+      }
+      carousel.addEventListener('touchstart', onTouchStart, { passive: true })
+      carousel.addEventListener('touchmove', onTouchMove, { passive: false })
+      carousel.addEventListener('touchend', onTouchEnd, { passive: true })
+      carousel.addEventListener('touchcancel', onTouchEnd, { passive: true })
+
+      // Click-and-drag — the discoverable way to scroll left/right with a plain mouse.
+      let mouseStartX = 0, mouseStartOffset = 0, mouseDragging = false
+      const onMouseDown = (e) => {
+        mouseStartX = e.clientX
+        mouseStartOffset = offset
+        mouseDragging = true
+        paused = true
+        carousel.classList.add('dragging')
+      }
+      const onMouseMove = (e) => {
+        if (!mouseDragging) return
+        e.preventDefault()
+        const dx = mouseStartX - e.clientX
+        const half = halfWidth()
+        if (half > 0) {
+          offset = ((mouseStartOffset + dx) % half + half) % half
+          track.style.transform = `translateX(${-offset}px)`
+        }
+      }
+      const onMouseUp = () => {
+        if (!mouseDragging) return
+        mouseDragging = false
+        paused = false // hand it back to the drift once released
+        carousel.classList.remove('dragging')
+      }
+      carousel.addEventListener('mousedown', onMouseDown)
+      window.addEventListener('mousemove', onMouseMove)
+      window.addEventListener('mouseup', onMouseUp)
+      carousel.classList.add('draggable')
+      carousel._dragCleanup = () => {
+        carousel.removeEventListener('mousedown', onMouseDown)
+        window.removeEventListener('mousemove', onMouseMove)
+        window.removeEventListener('mouseup', onMouseUp)
+      }
     }
 
     rafId = requestAnimationFrame(step)
@@ -631,6 +715,13 @@
       carousel.removeEventListener('mouseenter', onEnter)
       carousel.removeEventListener('mouseleave', onLeave)
       if (onWheel) carousel.removeEventListener('wheel', onWheel)
+      if (onTouchStart) carousel.removeEventListener('touchstart', onTouchStart)
+      if (onTouchMove) carousel.removeEventListener('touchmove', onTouchMove)
+      if (onTouchEnd) {
+        carousel.removeEventListener('touchend', onTouchEnd)
+        carousel.removeEventListener('touchcancel', onTouchEnd)
+      }
+      if (carousel._dragCleanup) { carousel._dragCleanup(); carousel._dragCleanup = null }
     }
   }
 
