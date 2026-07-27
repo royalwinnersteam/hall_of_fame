@@ -490,7 +490,7 @@
       if (!membersByLevel[row.level]) membersByLevel[row.level] = []
       membersByLevel[row.level].push(row)
     }
-    headerSub.textContent = `${BOARD_LABELS[currentBoard]} — ${LEVELS.length} levels`
+    headerSub.textContent = `${BOARD_LABELS[currentBoard]} ${LEVELS.length}`
 
     levelListEl.innerHTML = ''
     for (const level of LEVELS) {
@@ -852,7 +852,7 @@
   function openModal(board, level) {
     activeBoard = board
     activeLevel = level
-    modalTitle.textContent = `Request to add a member — ${BOARD_LABELS[board]} Level ${level}`
+    modalTitle.textContent = `Request to add a member — ${BOARD_LABELS[board]} ${level}`
     updateIdentifierFields(board)
     resetWizard()
     modalOverlay.classList.add('open')
