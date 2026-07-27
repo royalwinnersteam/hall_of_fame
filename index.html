@@ -498,7 +498,7 @@
       if (!membersByLevel[row.level]) membersByLevel[row.level] = []
       membersByLevel[row.level].push(row)
     }
-    headerSub.textContent = `${BOARD_LABELS[currentBoard]} — ${LEVELS.length} levels`
+    headerSub.textContent = `${BOARD_LABELS[currentBoard]}`
 
     levelListEl.innerHTML = ''
     for (const level of LEVELS) {
