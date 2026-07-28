@@ -230,6 +230,9 @@
   // "Direct" boards share their parent board's identifier format
   // (vboost_direct -> Passport NFT, ts_direct -> Link ID).
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
+  // Level boards and their paired Direct board (vboost <-> vboost_direct, ts <-> ts_direct)
+  // are allowed to share the same NFT/ID — no duplicate block between the two.
+  function isPairedBoard(boardA, boardB) { return boardA !== boardB && isTsBoard(boardA) === isTsBoard(boardB) }
 
   // ---- Storage cleanup helper ----
   // Request photos are uploaded straight to the "member-photos" bucket by the
@@ -710,7 +713,7 @@
         if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
         return
       }
-      if (dupeRows && dupeRows.length) {
+      if (dupeRows && dupeRows.length && !isPairedBoard(dupeRows[0].board, req.board)) {
         const dupe = dupeRows[0]
         // If this request is a confirmed upgrade of exactly this existing member (same
         // board, and from the level it says it's upgrading from), remove the old member
