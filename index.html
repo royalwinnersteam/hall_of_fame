@@ -50,6 +50,7 @@
   }
   .header-title {
     font-family: var(--font-display); font-size: 17px; letter-spacing: 0.8px; text-transform: uppercase;
+    white-space: nowrap;
     background: linear-gradient(100deg, var(--whale-blue-light) 0%, var(--whale-blue) 45%, #eaf9ff 70%, var(--whale-blue) 100%);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
@@ -83,7 +84,7 @@
     .site-title-wrap { grid-column: 1; order: -1; }
     .site-title, .super-title { white-space: normal; }
     .header-right { grid-column: 1; justify-self: center; align-self: center; max-width: 100%; }
-    .royal-logo { height: auto; width: 130px; max-width: 60%; }
+    .royal-logo { height: auto; width: clamp(150px, 45vw, 240px); max-width: 80%; }
   }
   .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
 
