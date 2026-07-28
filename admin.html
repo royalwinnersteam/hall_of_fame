@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HOF — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0e17; --panel: #161a23; --panel-hover: #1c2130; --line: #262c3a;
+    --gold: #e8b65a; --gold-dim: #7a6636; --text: #edeff4; --muted: #8a90a3;
+    --danger: #e0685f; --success: #62b583;
+    --whale-blue: #4fc3e0; --whale-blue-light: #cdf1ff; --whale-navy: #0c1c33;
+    --font-display: 'Archivo Black', 'Inter', sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --font-mono: 'Roboto Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 900px 520px at 18% -8%, rgba(79, 195, 224, 0.16), transparent 60%),
+      radial-gradient(ellipse 700px 480px at 100% 0%, rgba(232, 182, 90, 0.10), transparent 55%),
+      radial-gradient(ellipse 1000px 600px at 50% 110%, rgba(79, 195, 224, 0.08), transparent 60%),
+      linear-gradient(180deg, #0d1526 0%, #070a12 100%);
+    background-attachment: fixed;
+    color: var(--text); font-family: var(--font-body); -webkit-font-smoothing: antialiased;
+  }
+
+  /* Full-bleed app shell — fills the viewport instead of sitting in a narrow column */
+  .app { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 56px) 80px; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .header-brand { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 44px; height: 44px; flex-shrink: 0; display: block;
+    object-fit: contain; background: transparent;
+    filter: drop-shadow(0 4px 10px rgba(79, 195, 224, 0.35));
+  }
+  .header-title {
+    font-family: var(--font-display); font-size: 17px; letter-spacing: 0.8px; text-transform: uppercase;
+    background: linear-gradient(100deg, var(--whale-blue-light) 0%, var(--whale-blue) 45%, #eaf9ff 70%, var(--whale-blue) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .header-panel { display: block; }
+  .header-panel-name {
+    font-family: var(--font-display); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--gold); margin-top: 2px;
+  }
+  .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* View tabs — switch between the pending-requests queue and the members roster */
+  .view-tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 14px; width: fit-content; }
+  .view-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 9px 20px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+  .view-tab.active { background: var(--whale-blue); color: #04141c; }
+  .view-tab .tab-count { font-family: var(--font-mono); font-weight: 500; opacity: 0.85; margin-left: 6px; }
+
+  /* Board tabs */
+  .board-tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
+  .board-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 9px 20px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+  .board-tab.active { background: var(--gold); color: #14161c; }
+  .board-tab .tab-count { font-family: var(--font-mono); font-weight: 500; opacity: 0.75; margin-left: 6px; }
+
+  /* Member rows — same layout as request rows, minus the proof photo and action buttons */
+  .member-photo-block .request-photo-tag { color: var(--whale-blue-light); }
+
+  .empty-state { border: 1px dashed var(--line); border-radius: 12px; padding: 48px 20px; text-align: center; color: var(--muted); font-size: 14px; display: none; }
+
+  /* Request list — full-width rows, all details visible left to right, no click-to-expand */
+  .request-list { display: flex; flex-direction: column; gap: 12px; }
+  .request-row {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    transition: border-color 0.15s ease;
+  }
+  .request-row:hover { border-color: var(--gold-dim); }
+
+  .request-photos { display: flex; gap: 8px; flex-shrink: 0; }
+  .request-photo-block { text-align: center; }
+  .request-photos img {
+    width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: var(--line);
+    border: 1px solid var(--line); cursor: zoom-in; display: block;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+  }
+  .request-photos img:hover { transform: scale(1.04); border-color: var(--whale-blue); }
+  .request-photos .proof-photo {
+    width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: var(--line);
+    border: 1px solid var(--line); display: block;
+  }
+  .request-photo-tag {
+    font-family: var(--font-mono); font-size: 9px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.4px; margin-top: 4px;
+  }
+
+  .request-fields { flex: 1; min-width: 260px; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 20px; }
+  .request-field-label { font-family: var(--font-mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .request-field-value { font-size: 14px; font-weight: 600; word-break: break-word; }
+  .request-field-value.request-name { font-size: 15px; color: var(--whale-blue-light); }
+  .request-field-value.request-level { color: var(--gold); }
+  .request-field-value.request-type { color: var(--whale-blue-light); }
+
+  .request-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+  .btn { border: none; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-accept { background: var(--success); color: #0d1f16; }
+  .btn-reject { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .btn-delete { background: var(--danger); color: #2a0c0a; }
+  .btn-remove { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 10px 18px; border-radius: 8px; font-size: 13px; display: none; z-index: 200; }
+
+  /* Photo lightbox — opens the full-size photo when a thumbnail is clicked */
+  .lightbox-overlay {
+    position: fixed; inset: 0; background: rgba(6, 8, 12, 0.88); backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; padding: 24px; z-index: 300; cursor: zoom-out;
+  }
+  .lightbox-overlay.open { display: flex; }
+  .lightbox-overlay img {
+    max-width: min(90vw, 640px); max-height: 85vh; border-radius: 14px;
+    border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    display: block;
+  }
+  .lightbox-close {
+    position: absolute; top: 20px; right: 24px; background: var(--panel); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; cursor: pointer;
+  }
+
+  /* Login gate */
+  .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; width: 100%; max-width: 360px; }
+  .login-card .logo-mark { margin: 0 auto 16px; }
+  .login-title { font-family: var(--font-display); font-size: 18px; text-align: center; margin-bottom: 6px; }
+  .login-sub { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 22px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; font-family: var(--font-body); }
+  .field input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .login-btn { width: 100%; border: none; border-radius: 8px; padding: 11px 16px; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--gold); color: #14161c; margin-top: 6px; }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-error { font-size: 12px; color: var(--danger); text-align: center; margin-top: 12px; display: none; }
+  .signed-in-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .signed-in-email { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  .signout-btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 640px) {
+    .request-row { flex-direction: column; align-items: stretch; }
+    .request-actions { margin-left: 0; }
+    .request-actions .btn { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Login gate: shown until a session exists -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <img class="logo-mark" src="mw.png" alt="Meta Whale logo" />
+    <div class="login-title">Admin sign in</div>
+    <div class="login-sub">Access is limited to invited admins.</div>
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" required autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">Sign in</button>
+      <p class="login-error" id="loginError"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Admin panel: hidden until signed in -->
+<div class="app hidden" id="appRoot">
+  <div class="signed-in-bar">
+    <span class="signed-in-email" id="signedInEmail"></span>
+    <button class="signout-btn" id="signOutBtn">Sign out</button>
+  </div>
+  <div class="header">
+    <div class="header-brand">
+      <img class="logo-mark" src="mw.png" alt="Meta Whale logo" />
+      <div class="header-panel">
+        <div class="header-title">Meta Whale</div>
+        <div class="header-panel-name">Admin</div>
+        <div class="header-sub" id="headerSub">loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" data-view="requests">Pending Requests <span class="tab-count" id="countRequests"></span></button>
+    <button class="view-tab" data-view="rejected">Rejected <span class="tab-count" id="countRejected"></span></button>
+    <button class="view-tab" data-view="members">Members <span class="tab-count" id="countMembers"></span></button>
+  </div>
+
+  <div class="board-tabs" id="boardTabs">
+    <button class="board-tab" data-board="vboost">V-Boost Level <span class="tab-count" id="countVboost"></span></button>
+    <button class="board-tab" data-board="ts">T&S Level <span class="tab-count" id="countTs"></span></button>
+    <button class="board-tab" data-board="vboost_direct">V-Boost Direct <span class="tab-count" id="countVboostDirect"></span></button>
+    <button class="board-tab" data-board="ts_direct">T&S Direct <span class="tab-count" id="countTsDirect"></span></button>
+  </div>
+
+  <div class="empty-state" id="emptyState">No pending requests right now.</div>
+  <div class="request-list" id="requestList"></div>
+</div>
+
+<!-- Photo lightbox: full-size view of a clicked photo -->
+<div class="lightbox-overlay" id="lightboxOverlay">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Close">✕</button>
+  <img id="lightboxImg" alt="Full size photo" />
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+  const SUPABASE_URL = 'https://ghyaoezeeecfxizegqov.supabase.co'
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoeWFvZXplZWVjZnhpemVncW92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDA3OTMsImV4cCI6MjEwMDM3Njc5M30.5tFudWfakxruQ6sVbHiIHuuQue7kxkciEykbPEZVuKI'
+  const PHOTO_BUCKET = 'member-photos'
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+  const BOARD_LABELS = { vboost: 'V-Boost', ts: 'T&S', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct' }
+  // "Direct" boards share their parent board's identifier format
+  // (vboost_direct -> Passport NFT, ts_direct -> Link ID).
+  function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
+
+  // ---- Storage cleanup helper ----
+  // Request photos are uploaded straight to the "member-photos" bucket by the
+  // public site as board/level/uuid.ext — this turns a stored public URL back into
+  // that bucket-relative path so we can delete the file itself, not just the DB row.
+  function storagePathFromUrl(url) {
+    if (!url) return null
+    const marker = `/object/public/${PHOTO_BUCKET}/`
+    const idx = url.indexOf(marker)
+    if (idx === -1) return null
+    return decodeURIComponent(url.slice(idx + marker.length))
+  }
+
+  async function deleteFromStorage(url) {
+    const path = storagePathFromUrl(url)
+    if (!path) return
+    const { error } = await supabase.storage.from(PHOTO_BUCKET).remove([path])
+    if (error) console.error('Could not delete file from storage:', path, error)
+  }
+
+  // ---- Auth gate ----
+  const loginScreen = document.getElementById('loginScreen')
+  const appRoot = document.getElementById('appRoot')
+  const loginForm = document.getElementById('loginForm')
+  const loginEmail = document.getElementById('loginEmail')
+  const loginPassword = document.getElementById('loginPassword')
+  const loginBtn = document.getElementById('loginBtn')
+  const loginError = document.getElementById('loginError')
+  const signedInEmail = document.getElementById('signedInEmail')
+  const signOutBtn = document.getElementById('signOutBtn')
+
+  let realtimeChannel = null
+
+  function showApp(session) {
+    loginScreen.classList.add('hidden')
+    appRoot.classList.remove('hidden')
+    signedInEmail.textContent = session.user.email
+    loadRequests()
+    loadMembers()
+    if (!realtimeChannel) {
+      realtimeChannel = supabase
+        .channel('requests-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+          loadRequests()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => {
+          loadMembers()
+        })
+        .subscribe()
+    }
+  }
+
+  function showLogin() {
+    appRoot.classList.add('hidden')
+    loginScreen.classList.remove('hidden')
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel)
+      realtimeChannel = null
+    }
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    loginError.style.display = 'none'
+    loginBtn.disabled = true
+    loginBtn.textContent = 'Signing in…'
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail.value.trim(),
+      password: loginPassword.value,
+    })
+
+    loginBtn.disabled = false
+    loginBtn.textContent = 'Sign in'
+
+    if (error) {
+      loginError.textContent = error.message
+      loginError.style.display = 'block'
+    }
+  })
+
+  signOutBtn.addEventListener('click', async () => {
+    await supabase.auth.signOut()
+  })
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session) showApp(session)
+    else showLogin()
+  })
+
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) showApp(session)
+    else showLogin()
+  })
+
+  // ---- Admin panel logic (only runs once signed in) ----
+  const listEl = document.getElementById('requestList')
+  const emptyState = document.getElementById('emptyState')
+  const headerSub = document.getElementById('headerSub')
+  const toastEl = document.getElementById('toast')
+  const boardTabs = document.getElementById('boardTabs')
+  const countVboost = document.getElementById('countVboost')
+  const countTs = document.getElementById('countTs')
+  const countVboostDirect = document.getElementById('countVboostDirect')
+  const countTsDirect = document.getElementById('countTsDirect')
+  const BOARD_COUNT_ELS = { vboost: countVboost, ts: countTs, vboost_direct: countVboostDirect, ts_direct: countTsDirect }
+  const viewTabs = document.getElementById('viewTabs')
+  const countMembers = document.getElementById('countMembers')
+  const countRejected = document.getElementById('countRejected')
+  const countRequests = document.getElementById('countRequests')
+
+  // Keeps the two view-tab counts (Pending Requests / Rejected) in sync with
+  // allRequests — called any time that array changes.
+  function updateViewTabCounts() {
+    countRequests.textContent = allRequests.filter((r) => (r.status || 'pending') === 'pending').length
+    countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+  }
+
+  let allRequests = []
+  let allMembers = []
+  let currentBoard = 'vboost'
+  let currentView = 'requests' // 'requests' | 'rejected' | 'members'
+
+  function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    return `${Math.floor(hours / 24)}d ago`
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div')
+    div.textContent = str
+    return div.innerHTML
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg
+    toastEl.style.display = 'block'
+    setTimeout(() => (toastEl.style.display = 'none'), 2000)
+  }
+
+  async function loadRequests() {
+    const { data, error } = await supabase
+      .from('requests')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Failed to load requests:', error)
+      allRequests = []
+      updateViewTabCounts()
+      updateTabCounts()
+      render()
+      headerSub.textContent = `Couldn't load requests — ${error.message || 'check your Supabase setup'}`
+      return
+    }
+    allRequests = data
+    updateViewTabCounts()
+    updateTabCounts()
+    render()
+  }
+
+  async function loadMembers() {
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Failed to load members:', error)
+      allMembers = []
+      updateTabCounts()
+      render()
+      return
+    }
+    allMembers = data
+    countMembers.textContent = allMembers.length
+    updateTabCounts()
+    render()
+  }
+
+  function updateTabCounts() {
+    for (const board of Object.keys(BOARD_LABELS)) {
+      const el = BOARD_COUNT_ELS[board]
+      if (!el) continue
+      if (currentView === 'members') {
+        el.textContent = allMembers.filter((m) => m.board === board).length
+      } else if (currentView === 'rejected') {
+        el.textContent = allRequests.filter((r) => r.board === board && r.status === 'rejected').length
+      } else {
+        el.textContent = allRequests.filter((r) => r.board === board && (r.status || 'pending') === 'pending').length
+      }
+    }
+  }
+
+  boardTabs.querySelectorAll('.board-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      currentBoard = tab.dataset.board
+      render()
+    })
+  })
+
+  viewTabs.querySelectorAll('.view-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      currentView = tab.dataset.view
+      viewTabs.querySelectorAll('.view-tab').forEach((t) => t.classList.toggle('active', t === tab))
+      updateTabCounts()
+      render()
+    })
+  })
+
+  function currentRequests() {
+    return allRequests.filter((r) => r.board === currentBoard && (r.status || 'pending') === 'pending')
+  }
+
+  function currentRejectedRequests() {
+    return allRequests.filter((r) => r.board === currentBoard && r.status === 'rejected')
+  }
+
+  function currentMembers() {
+    return allMembers.filter((m) => m.board === currentBoard)
+  }
+
+  // Every request now renders as a full-width row showing all its details at once —
+  // Hall of Fame photo, proof photo, name, district, phone, board identifier, level and submitted time —
+  // with no click-to-expand step needed. Clicking the Hall of Fame thumbnail opens it
+  // full-size in the lightbox; the proof photo is shown beside the Hall of Fame photo.
+  function render() {
+    boardTabs.querySelectorAll('.board-tab').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.board === currentBoard)
+    })
+
+    if (currentView === 'members') {
+      renderMembers()
+    } else if (currentView === 'rejected') {
+      renderRejected()
+    } else {
+      renderRequests()
+    }
+  }
+
+  function renderRequests() {
+    const requests = currentRequests()
+    headerSub.textContent = `${requests.length} awaiting review in ${BOARD_LABELS[currentBoard]}`
+    emptyState.textContent = 'No pending requests right now.'
+    emptyState.style.display = requests.length === 0 ? 'block' : 'none'
+    listEl.innerHTML = ''
+
+    for (const req of requests) {
+      const row = document.createElement('div')
+      row.className = 'request-row'
+      row.innerHTML = `
+        <div class="request-photos">
+          <div class="request-photo-block">
+            <img src="${escapeHtml(req.photo_url)}" alt="Hall of Fame photo" data-full="${escapeHtml(req.photo_url)}" />
+            <div class="request-photo-tag">Hall of Fame</div>
+          </div>
+          <div class="request-photo-block">
+            <img class="proof-photo" src="${escapeHtml(req.proof_photo_url)}" alt="Proof photo" data-full="${escapeHtml(req.proof_photo_url)}" />
+            <div class="request-photo-tag">Proof photo</div>
+          </div>
+        </div>
+        <div class="request-fields">
+          <div>
+            <div class="request-field-label">Name</div>
+            <div class="request-field-value request-name">${escapeHtml(req.name)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">District</div>
+            <div class="request-field-value">${escapeHtml(req.district)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Level</div>
+            <div class="request-field-value request-level">${BOARD_LABELS[req.board] || req.board} · L${req.level}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Type</div>
+            <div class="request-field-value request-type">${req.is_upgrade ? `Upgrade from L${req.upgrade_from_level}` : 'New member'}</div>
+          </div>
+          <div>
+            <div class="request-field-label">WhatsApp</div>
+            <div class="request-field-value">${escapeHtml(req.phone)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'}</div>
+            <div class="request-field-value">${escapeHtml(req.passport_nft)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Submitted</div>
+            <div class="request-field-value">${timeAgo(req.created_at)}</div>
+          </div>
+        </div>
+        <div class="request-actions">
+          <button class="btn btn-accept" data-id="${req.id}" data-action="accept">Accept</button>
+          <button class="btn btn-reject" data-id="${req.id}" data-action="reject">Reject</button>
+        </div>
+      `
+      row.querySelectorAll('.request-photos img').forEach((img) => {
+        img.addEventListener('click', () => openLightbox(img.dataset.full))
+      })
+      row.querySelectorAll('.request-actions button').forEach((btn) => {
+        btn.addEventListener('click', () => handleAction(btn.dataset.id, btn.dataset.action, btn))
+      })
+      listEl.appendChild(row)
+    }
+  }
+
+  // Rejected requests — same row layout as a pending request, but the photo (and
+  // proof photo, if it's still there) stays visible for reference. Actions are
+  // "Accept" (in case it was rejected by mistake) and "Delete permanently",
+  // which removes the row and its files from storage for good.
+  function renderRejected() {
+    const requests = currentRejectedRequests()
+    headerSub.textContent = `${requests.length} rejected in ${BOARD_LABELS[currentBoard]}`
+    emptyState.textContent = 'No rejected forms right now.'
+    emptyState.style.display = requests.length === 0 ? 'block' : 'none'
+    listEl.innerHTML = ''
+
+    for (const req of requests) {
+      const row = document.createElement('div')
+      row.className = 'request-row'
+      row.innerHTML = `
+        <div class="request-photos">
+          <div class="request-photo-block">
+            <img src="${escapeHtml(req.photo_url)}" alt="Hall of Fame photo" data-full="${escapeHtml(req.photo_url)}" />
+            <div class="request-photo-tag">Hall of Fame</div>
+          </div>
+          <div class="request-photo-block">
+            <img class="proof-photo" src="${escapeHtml(req.proof_photo_url)}" alt="Proof photo" data-full="${escapeHtml(req.proof_photo_url)}" />
+            <div class="request-photo-tag">Proof photo</div>
+          </div>
+        </div>
+        <div class="request-fields">
+          <div>
+            <div class="request-field-label">Name</div>
+            <div class="request-field-value request-name">${escapeHtml(req.name)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">District</div>
+            <div class="request-field-value">${escapeHtml(req.district)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Level</div>
+            <div class="request-field-value request-level">${BOARD_LABELS[req.board] || req.board} · L${req.level}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Type</div>
+            <div class="request-field-value request-type">${req.is_upgrade ? `Upgrade from L${req.upgrade_from_level}` : 'New member'}</div>
+          </div>
+          <div>
+            <div class="request-field-label">WhatsApp</div>
+            <div class="request-field-value">${escapeHtml(req.phone)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'}</div>
+            <div class="request-field-value">${escapeHtml(req.passport_nft)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Rejected</div>
+            <div class="request-field-value">${timeAgo(req.created_at)}</div>
+          </div>
+        </div>
+        <div class="request-actions">
+          <button class="btn btn-accept" data-id="${req.id}" data-action="accept">Accept</button>
+          <button class="btn btn-delete" data-id="${req.id}" data-action="delete">Delete permanently</button>
+        </div>
+      `
+      row.querySelectorAll('.request-photos img').forEach((img) => {
+        img.addEventListener('click', () => openLightbox(img.dataset.full))
+      })
+      row.querySelectorAll('.request-actions button').forEach((btn) => {
+        btn.addEventListener('click', () => handleAction(btn.dataset.id, btn.dataset.action, btn))
+      })
+      listEl.appendChild(row)
+    }
+  }
+
+  // Members roster — same row layout as a request, minus the proof photo (members
+  // no longer keep one, see the proof-photo cleanup in handleAction()) and minus the
+  // accept/reject actions, since there's nothing left to review.
+  function renderMembers() {
+    const members = currentMembers()
+    headerSub.textContent = `${members.length} member${members.length === 1 ? '' : 's'} on the ${BOARD_LABELS[currentBoard]} roster`
+    emptyState.textContent = 'No members on this roster yet.'
+    emptyState.style.display = members.length === 0 ? 'block' : 'none'
+    listEl.innerHTML = ''
+
+    for (const m of members) {
+      const row = document.createElement('div')
+      row.className = 'request-row'
+      row.innerHTML = `
+        <div class="request-photos">
+          <div class="request-photo-block member-photo-block">
+            <img src="${escapeHtml(m.photo_url)}" alt="Hall of Fame photo" data-full="${escapeHtml(m.photo_url)}" />
+            <div class="request-photo-tag">Hall of Fame</div>
+          </div>
+        </div>
+        <div class="request-fields">
+          <div>
+            <div class="request-field-label">Name</div>
+            <div class="request-field-value request-name">${escapeHtml(m.name)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">District</div>
+            <div class="request-field-value">${m.district ? escapeHtml(m.district) : '—'}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Level</div>
+            <div class="request-field-value request-level">${BOARD_LABELS[m.board] || m.board} · L${m.level}</div>
+          </div>
+          <div>
+            <div class="request-field-label">WhatsApp</div>
+            <div class="request-field-value">${escapeHtml(m.phone)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">${isTsBoard(m.board) ? 'Link ID' : 'Passport NFT'}</div>
+            <div class="request-field-value">${m.passport_nft ? escapeHtml(m.passport_nft) : '—'}</div>
+          </div>
+          <div>
+            <div class="request-field-label">Member since</div>
+            <div class="request-field-value">${timeAgo(m.created_at)}</div>
+          </div>
+        </div>
+        <div class="request-actions">
+          <button class="btn btn-remove" data-id="${m.id}" data-action="remove">Remove</button>
+        </div>
+      `
+      row.querySelectorAll('.request-photos img').forEach((img) => {
+        img.addEventListener('click', () => openLightbox(img.dataset.full))
+      })
+      row.querySelectorAll('.request-actions button').forEach((btn) => {
+        btn.addEventListener('click', () => handleMemberRemove(btn.dataset.id, btn))
+      })
+      listEl.appendChild(row)
+    }
+  }
+
+  // ---- Photo lightbox ----
+  const lightboxOverlay = document.getElementById('lightboxOverlay')
+  const lightboxImg = document.getElementById('lightboxImg')
+  const lightboxClose = document.getElementById('lightboxClose')
+
+  function openLightbox(src) {
+    lightboxImg.src = src
+    lightboxOverlay.classList.add('open')
+  }
+  function closeLightbox() {
+    lightboxOverlay.classList.remove('open')
+    lightboxImg.src = ''
+  }
+  lightboxClose.addEventListener('click', closeLightbox)
+  lightboxOverlay.addEventListener('click', (e) => {
+    if (e.target === lightboxOverlay) closeLightbox()
+  })
+
+  async function handleAction(id, action, btnEl) {
+    const req = allRequests.find((r) => r.id === id)
+    if (!req) return
+
+    const row = btnEl.closest('.request-row')
+    if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = true))
+
+    if (action === 'accept') {
+      // guard against two pending requests sharing the same board identifier both
+      // getting accepted — check the members table right before inserting
+      const { data: dupeRows, error: dupeErr } = await supabase
+        .from('members')
+        .select('*')
+        .eq('passport_nft', req.passport_nft)
+        .limit(1)
+      if (dupeErr) {
+        console.error(dupeErr)
+        showToast(`Could not verify ${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'} — try again.`)
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+      if (dupeRows && dupeRows.length) {
+        const dupe = dupeRows[0]
+        // If this request is a confirmed upgrade of exactly this existing member (same
+        // board, and from the level it says it's upgrading from), remove the old member
+        // row — its photo disappears from the old level as the new one appears on accept.
+        // Otherwise this is an unexpected duplicate NFT and acceptance is blocked.
+        const isExpectedUpgrade = req.is_upgrade && dupe.board === req.board && dupe.level === req.upgrade_from_level
+        if (!isExpectedUpgrade) {
+          showToast(`${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'} is already there in ${BOARD_LABELS[dupe.board] || dupe.board} Level ${dupe.level}.`)
+          if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+          return
+        }
+        const { error: removeOldError } = await supabase.from('members').delete().eq('id', dupe.id)
+        if (removeOldError) {
+          console.error(removeOldError)
+          showToast('Could not remove the previous level entry — try again.')
+          if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+          return
+        }
+        deleteFromStorage(dupe.photo_url)
+      }
+
+      const { error: insertError } = await supabase.from('members').insert({
+        board: req.board,
+        level: req.level,
+        name: req.name,
+        district: req.district,
+        phone: req.phone,
+        passport_nft: req.passport_nft,
+        photo_url: req.photo_url,
+        // Preserve the date the member originally submitted their request (shown
+        // publicly on the Hall of Fame page) — not the moment an admin got to it.
+        submitted_at: req.created_at,
+      })
+      if (insertError) {
+        console.error(insertError)
+        if (dupeRows && dupeRows.length && req.is_upgrade) {
+          const { error: restoreError } = await supabase.from('members').insert(dupeRows[0])
+          if (restoreError) console.error('Could not restore the previous member:', restoreError)
+        }
+        if (insertError.code === '23505') {
+          showToast(`${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'} is already there on the roster.`)
+        } else {
+          showToast('Could not accept — try again.')
+        }
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+      const { error: deleteError } = await supabase.from('requests').delete().eq('id', req.id)
+      if (deleteError) console.error(deleteError)
+
+      // Member is saved with just the Hall of Fame photo — the proof photo was only
+      // needed for this review, so delete it from storage now to save space.
+      deleteFromStorage(req.proof_photo_url)
+
+      allRequests = allRequests.filter((r) => r.id !== id)
+      showToast(req.is_upgrade
+        ? `Upgraded ${req.name} to ${BOARD_LABELS[req.board]} level ${req.level}`
+        : `Added ${req.name} to ${BOARD_LABELS[req.board]} level ${req.level}`)
+      updateTabCounts()
+      updateViewTabCounts()
+      render()
+    } else if (action === 'reject') {
+      // Soft reject — keep the row (and its photos) so it shows up under
+      // the Rejected tab, where it can still be accepted later or deleted for good.
+      const { error } = await supabase.from('requests').update({ status: 'rejected' }).eq('id', req.id)
+      if (error) {
+        console.error(error)
+        showToast('Could not reject — try again.')
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+
+      req.status = 'rejected'
+      showToast('Request rejected')
+      updateTabCounts()
+      updateViewTabCounts()
+      render()
+    } else if (action === 'delete') {
+      // Permanent delete — only reachable from the Rejected tab. Removes the row
+      // and cleans up both files from storage.
+      const { error } = await supabase.from('requests').delete().eq('id', req.id)
+      if (error) {
+        console.error(error)
+        showToast('Could not delete — try again.')
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+
+      await Promise.all([
+        deleteFromStorage(req.photo_url),
+        deleteFromStorage(req.proof_photo_url),
+      ])
+
+      allRequests = allRequests.filter((r) => r.id !== id)
+      showToast('Request deleted permanently')
+      updateTabCounts()
+      updateViewTabCounts()
+      render()
+    }
+  }
+
+  async function handleMemberRemove(id, btnEl) {
+    const member = allMembers.find((m) => m.id === id)
+    if (!member) return
+
+    const row = btnEl.closest('.request-row')
+    if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = true))
+
+    const { error } = await supabase.from('members').delete().eq('id', id)
+    if (error) {
+      console.error(error)
+      showToast('Could not remove member — try again.')
+      if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+      return
+    }
+
+    // Member is gone from the roster — clean up their Hall of Fame photo too.
+    deleteFromStorage(member.photo_url)
+
+    allMembers = allMembers.filter((m) => m.id !== id)
+    countMembers.textContent = allMembers.length
+    showToast(`Removed ${member.name} from the roster`)
+    updateTabCounts()
+    render()
+  }
+
+  // Init + realtime are wired up above via showApp(), triggered once
+  // supabase.auth.getSession() / onAuthStateChange finds a valid session.
+</script>
+</body>
+</html>
