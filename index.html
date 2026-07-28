@@ -32,7 +32,7 @@
   }
 
   /* Full-bleed app shell — fills the viewport instead of sitting in a narrow column */
-  .app { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 56px) 80px; }
+  .app { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px clamp(20px, 4vw, 56px) 80px; position: relative; }
 
   .header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; margin-bottom: 28px; }
   .header-brand-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; grid-column: 1; justify-self: start; }
@@ -94,6 +94,45 @@
     .royal-logo { max-height: clamp(150px, 16vw, 230px); }
   }
   .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ---- Contact chip: its own centered row above the header ---- */
+  .contact-chip-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 60px;   /* Space above it */
+    margin-bottom: 20px;
+  }
+  .contact-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px 9px 12px; border-radius: 999px;
+    background: linear-gradient(180deg, rgba(22, 26, 35, 0.9), rgba(12, 16, 24, 0.9));
+    border: 1px solid var(--gold-dim);
+    text-decoration: none; color: var(--text);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .contact-chip:hover {
+    border-color: var(--gold);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(232, 182, 90, 0.25);
+  }
+  .contact-chip-icon {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 30% 30%, var(--whale-blue-light), var(--whale-blue) 70%);
+  }
+  .contact-chip-icon svg { width: 15px; height: 15px; }
+  .contact-chip-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .contact-chip-label {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .contact-chip-number {
+    font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: 0.3px;
+    color: var(--gold);
+    white-space: nowrap;
+  }
 
   /* ---- Board tabs: switch between the two lists on this one page ---- */
   .board-header{
@@ -314,6 +353,21 @@
   </div>
   
   <div class="level-list" id="levelList"></div>
+
+  <div class="contact-chip-row">
+    <a class="contact-chip" href="tel:+918883442000">
+      <span class="contact-chip-icon">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6.6 10.2c1.3 2.6 3.4 4.7 6 6l2-2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V19c0 .6-.4 1-1 1C10.4 20 4 13.6 4 5.9c0-.5.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.2 1l-2 1.8Z" fill="#0c1c33"/>
+        </svg>
+      </span>
+      <span class="contact-chip-text">
+        <span class="contact-chip-label">Any enquiry? Call us</span>
+        <span class="contact-chip-number">+91 88834 42000</span>
+      </span>
+    </a>
+  </div>
+
 </div>
 
 <!-- Modal -->
@@ -462,6 +516,10 @@
   // just with 30 levels instead of 10/12, and their own level-tag wording.
   function isDirectBoard(board) { return board === 'vboost_direct' || board === 'ts_direct' }
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
+  // Level boards and their paired Direct board (vboost <-> vboost_direct, ts <-> ts_direct)
+  // are allowed to share the same NFT/ID — they're the same category, so no cross-board
+  // block or upgrade prompt should happen between the two.
+  function isPairedBoard(boardA, boardB) { return boardA !== boardB && isTsBoard(boardA) === isTsBoard(boardB) }
   function levelTagLabel(board, level) {
     const boardName = isTsBoard(board) ? 'T&S' : 'V-Boost'
     const line2 = isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
@@ -1269,14 +1327,28 @@
       nextBtn.textContent = 'Checking…'
       try {
         const existing = await findExistingNft(nft)
-        if (existing) {
+        if (existing && isPairedBoard(existing.board, activeBoard)) {
+          // Same NFT/ID already sits on the paired board (Level <-> Direct within the
+          // same category) — that's allowed, so treat this as a fresh registration.
+          isUpgrade = false
+          upgradeFromLevel = null
+        } else if (existing) {
           if (existing.board === activeBoard && existing.level === Number(activeLevel)) {
             // Same board, same level — this is a straight duplicate, not an upgrade.
             showError(`${identifierName(existing.board)} ${nft} is already there in ${BOARD_LABELS[existing.board] || existing.board} Level ${existing.level}.`)
             return
           }
-          // Found elsewhere — offer to continue as an upgrade/transfer to the level
-          // they picked. This also covers moving between boards.
+          if (existing.board !== activeBoard) {
+            // Found on a different, non-paired board (e.g. already in V-Boost Level/Direct
+            // while trying to add to T&S Level/Direct). Paired boards (Level <-> its own
+            // Direct) are already handled above and never reach this branch. This is NOT
+            // an upgrade — block it outright instead of offering a cross-category
+            // "upgrade" that would just get rejected later.
+            showError(`${identifierName(existing.board)} ${nft} is already registered in ${BOARD_LABELS[existing.board] || existing.board} Level ${existing.level}. It can't also be added to ${BOARD_LABELS[activeBoard]}.`)
+            return
+          }
+          // Found on the same board, different level — offer to continue as a
+          // level upgrade.
           isUpgrade = true
           upgradeFromLevel = existing.level
           upgradeNoticeText.textContent = `${identifierName(existing.board)} ${nft} is already there in ${BOARD_LABELS[existing.board] || existing.board} Level ${existing.level}. Do you want to upgrade to ${BOARD_LABELS[activeBoard]} Level ${activeLevel} and continue?`
@@ -1337,8 +1409,8 @@
       // last-moment re-check in case someone else grabbed this NFT number while this
       // person was filling out the rest of the form
       const existing = await findExistingNft(nft)
-      if (existing) {
-        const isExpectedUpgradeTarget = isUpgrade && existing.level === upgradeFromLevel
+      if (existing && !isPairedBoard(existing.board, activeBoard)) {
+        const isExpectedUpgradeTarget = isUpgrade && existing.board === activeBoard && existing.level === upgradeFromLevel
         if (!isExpectedUpgradeTarget) {
           showStep(4)
           showError(`${identifierName(existing.board)} ${nft} is already there in ${BOARD_LABELS[existing.board] || existing.board} Level ${existing.level}.`)
