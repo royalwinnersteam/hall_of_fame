@@ -193,7 +193,7 @@
   </div>
 
   <div class="view-tabs" id="viewTabs">
-    <button class="view-tab active" data-view="requests">Pending Requests</button>
+    <button class="view-tab active" data-view="requests">Pending Requests <span class="tab-count" id="countRequests"></span></button>
     <button class="view-tab" data-view="rejected">Rejected <span class="tab-count" id="countRejected"></span></button>
     <button class="view-tab" data-view="members">Members <span class="tab-count" id="countMembers"></span></button>
   </div>
@@ -339,6 +339,14 @@
   const viewTabs = document.getElementById('viewTabs')
   const countMembers = document.getElementById('countMembers')
   const countRejected = document.getElementById('countRejected')
+  const countRequests = document.getElementById('countRequests')
+
+  // Keeps the two view-tab counts (Pending Requests / Rejected) in sync with
+  // allRequests — called any time that array changes.
+  function updateViewTabCounts() {
+    countRequests.textContent = allRequests.filter((r) => (r.status || 'pending') === 'pending').length
+    countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+  }
 
   let allRequests = []
   let allMembers = []
@@ -376,13 +384,14 @@
     if (error) {
       console.error('Failed to load requests:', error)
       allRequests = []
+      updateViewTabCounts()
       updateTabCounts()
       render()
       headerSub.textContent = `Couldn't load requests — ${error.message || 'check your Supabase setup'}`
       return
     }
     allRequests = data
-    countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+    updateViewTabCounts()
     updateTabCounts()
     render()
   }
@@ -761,6 +770,7 @@
         ? `Upgraded ${req.name} to ${BOARD_LABELS[req.board]} level ${req.level}`
         : `Added ${req.name} to ${BOARD_LABELS[req.board]} level ${req.level}`)
       updateTabCounts()
+      updateViewTabCounts()
       render()
     } else if (action === 'reject') {
       // Soft reject — keep the row (and its photos) so it shows up under
@@ -776,7 +786,7 @@
       req.status = 'rejected'
       showToast('Request rejected')
       updateTabCounts()
-      countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+      updateViewTabCounts()
       render()
     } else if (action === 'delete') {
       // Permanent delete — only reachable from the Rejected tab. Removes the row
@@ -797,7 +807,7 @@
       allRequests = allRequests.filter((r) => r.id !== id)
       showToast('Request deleted permanently')
       updateTabCounts()
-      countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+      updateViewTabCounts()
       render()
     }
   }
