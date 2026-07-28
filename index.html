@@ -146,6 +146,24 @@
     max-width: calc(var(--card-size) + 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-top: -2px;
   }
+  .photo-date {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--gold-dim); text-align: center;
+    max-width: calc(var(--card-size) + 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 1px; letter-spacing: 0.02em;
+  }
+  .photo-new-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-top: 2px; padding: 2px 8px; border-radius: 999px;
+    font-family: var(--font-display); font-size: 9px; letter-spacing: 0.6px; text-transform: uppercase;
+    color: #2a1c05;
+    background: linear-gradient(135deg, #fff3d6 0%, var(--gold) 45%, #b9862f 100%);
+    box-shadow: 0 2px 6px rgba(232, 182, 90, 0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+    animation: newGlow 2.2s ease-in-out infinite;
+  }
+  @keyframes newGlow {
+    0%, 100% { box-shadow: 0 2px 6px rgba(232, 182, 90, 0.45), inset 0 1px 0 rgba(255,255,255,0.5); }
+    50% { box-shadow: 0 2px 12px rgba(232, 182, 90, 0.85), inset 0 1px 0 rgba(255,255,255,0.6); }
+  }
 
   /* ---- 3D-styled add button ---- */
   .add-btn {
@@ -456,7 +474,7 @@
 
   let lastMembersSignature = null
   function membersSignature(rows) {
-    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}`).sort().join('|')
+    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}:${r.submitted_at}`).sort().join('|')
   }
 
   async function loadMembers() {
@@ -544,12 +562,44 @@
     })
   }
 
+  // The date shown to visitors is the date the member originally *submitted*
+  // their request (submitted_at), not the date an admin happened to accept it
+  // (created_at on the members row). Older rows inserted before this field
+  // existed fall back to created_at so nothing breaks.
+  function memberDisplayDate(m) {
+    return m.submitted_at || m.created_at
+  }
+
+  function formatDisplayDate(dateStr) {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return ''
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}-${mm}-${yyyy}`
+  }
+
+  function isSameLocalDay(dateStr, ref) {
+    if (!dateStr) return false
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return false
+    return d.getFullYear() === ref.getFullYear() &&
+      d.getMonth() === ref.getMonth() &&
+      d.getDate() === ref.getDate()
+  }
+
   function renderPhotoCard(m) {
+    const displayDate = memberDisplayDate(m)
+    const dateLabel = formatDisplayDate(displayDate)
+    const isNew = isSameLocalDay(displayDate, new Date())
     return `
       <div class="photo-card">
         <img class="photo-square" src="${escapeHtml(m.photo_url)}" alt="${escapeHtml(m.name)}" />
         <div class="photo-name">${escapeHtml(m.name)}</div>
         ${m.district ? `<div class="photo-district">${escapeHtml(m.district)}</div>` : ''}
+        ${dateLabel ? `<div class="photo-date">${dateLabel}</div>` : ''}
+        ${isNew ? `<div class="photo-new-badge">New</div>` : ''}
       </div>
     `
   }
