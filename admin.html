@@ -109,7 +109,41 @@
   .btn-reject { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
   .btn-delete { background: var(--danger); color: #2a0c0a; }
   .btn-remove { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+  .btn-edit { background: transparent; border: 1px solid var(--whale-blue); color: var(--whale-blue); }
+  .btn-accept-changes { background: var(--success); color: #0d1f16; }
+  .btn-reject-changes { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 10px 18px; border-radius: 8px; font-size: 13px; display: none; z-index: 200; }
+
+  /* ---- Edit request rows — old value vs. proposed new value per field ---- */
+  .editreq-value-old { font-size: 12px; color: var(--muted); text-decoration: line-through; word-break: break-word; }
+  .editreq-value-new { font-size: 14px; font-weight: 700; color: var(--success); word-break: break-word; }
+  .editreq-value-unchanged { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
+  .editreq-photo-arrow { font-size: 18px; color: var(--muted); align-self: center; }
+
+  /* ---- Edit member modal ---- */
+  .edit-overlay { position: fixed; inset: 0; background: rgba(8,9,13,0.7); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 250; }
+  .edit-overlay.open { display: flex; }
+  .edit-modal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 100%; max-width: 420px; max-height: 88vh; overflow-y: auto; padding: 24px; }
+  .edit-modal-title { font-family: var(--font-display); font-size: 16px; margin: 0 0 4px; line-height: 1.3; }
+  .edit-modal-sub { font-size: 12px; color: var(--muted); margin: 0 0 20px; }
+  .edit-field { margin-bottom: 16px; }
+  .edit-field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .edit-field input[type="text"], .edit-field input[type="tel"], .edit-field select {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    color: var(--text); font-size: 14px; font-family: var(--font-body);
+  }
+  .edit-field input:focus, .edit-field select:focus { outline: 2px solid var(--gold-dim); outline-offset: 1px; }
+  .edit-photo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .edit-photo-preview { width: 84px; height: 84px; border-radius: 10px; object-fit: cover; background: var(--line); border: 1px solid var(--line); flex-shrink: 0; }
+  .edit-photo-btn { position: relative; overflow: hidden; }
+  .edit-photo-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .edit-photo-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .edit-error { font-size: 13px; font-weight: 600; color: var(--danger); background: rgba(224,104,95,0.12); border: 1px solid rgba(224,104,95,0.4); border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; display: none; }
+  .edit-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .edit-actions .btn { flex: 1; padding: 11px 16px; }
+  .btn-primary { background: var(--gold); color: #14161c; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: transparent; border: 1px solid var(--line); color: var(--text); }
 
   /* Photo lightbox — opens the full-size photo when a thumbnail is clicked */
   .lightbox-overlay {
@@ -126,6 +160,16 @@
     position: absolute; top: 20px; right: 24px; background: var(--panel); border: 1px solid var(--line);
     color: var(--text); border-radius: 8px; width: 36px; height: 36px; font-size: 18px; cursor: pointer;
   }
+
+  /* ---- Confirm modal — used before destructive actions (remove member / delete
+     permanently) so a stray click can't wipe something out ---- */
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(8,9,13,0.7); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 260; }
+  .confirm-overlay.open { display: flex; }
+  .confirm-modal { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 100%; max-width: 360px; padding: 24px; text-align: center; }
+  .confirm-title { font-family: var(--font-display); font-size: 16px; margin: 0 0 10px; line-height: 1.3; }
+  .confirm-message { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0 0 22px; }
+  .confirm-actions { display: flex; gap: 10px; }
+  .confirm-actions .btn { flex: 1; padding: 11px 16px; }
 
   /* Login gate */
   .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -196,6 +240,7 @@
     <button class="view-tab active" data-view="requests">Pending Requests <span class="tab-count" id="countRequests"></span></button>
     <button class="view-tab" data-view="rejected">Rejected <span class="tab-count" id="countRejected"></span></button>
     <button class="view-tab" data-view="members">Members <span class="tab-count" id="countMembers"></span></button>
+    <button class="view-tab" data-view="editRequests">Edit Requests <span class="tab-count" id="countEditRequests"></span></button>
   </div>
 
   <div class="board-tabs" id="boardTabs">
@@ -209,10 +254,73 @@
   <div class="request-list" id="requestList"></div>
 </div>
 
+<!-- Edit member modal -->
+<div class="edit-overlay" id="editOverlay">
+  <div class="edit-modal">
+    <h2 class="edit-modal-title">Edit member</h2>
+    <p class="edit-modal-sub" id="editModalSub">Update their details below. Changes appear on the Hall of Fame site automatically.</p>
+
+    <p class="edit-error" id="editError"></p>
+
+    <div class="edit-photo-row">
+      <img class="edit-photo-preview" id="editPhotoPreview" alt="" />
+      <div>
+        <button type="button" class="btn btn-secondary edit-photo-btn">
+          Change photo
+          <input type="file" accept="image/*" id="editPhotoInput" />
+        </button>
+        <div class="edit-photo-hint">Under 500 KB. Leave unchanged to keep the current photo.</div>
+      </div>
+    </div>
+
+    <div class="edit-field">
+      <label>Full name</label>
+      <input type="text" id="editNameInput" />
+    </div>
+
+    <div class="edit-field">
+      <label>District</label>
+      <input type="text" id="editDistrictInput" />
+    </div>
+
+    <div class="edit-field">
+      <label>WhatsApp number</label>
+      <input type="tel" id="editPhoneInput" placeholder="e.g. +919876543210" />
+    </div>
+
+    <div class="edit-field">
+      <label id="editIdentifierLabel">Passport NFT</label>
+      <input type="text" id="editIdentifierInput" />
+    </div>
+
+    <div class="edit-field">
+      <label>Level</label>
+      <select id="editLevelInput"></select>
+    </div>
+
+    <div class="edit-actions">
+      <button type="button" class="btn btn-secondary" id="editCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-primary" id="editSaveBtn">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- Photo lightbox: full-size view of a clicked photo -->
 <div class="lightbox-overlay" id="lightboxOverlay">
   <button class="lightbox-close" id="lightboxClose" aria-label="Close">✕</button>
   <img id="lightboxImg" alt="Full size photo" />
+</div>
+
+<!-- Confirm modal: shown before destructive actions (remove member / delete permanently) -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-modal">
+    <h2 class="confirm-title" id="confirmTitle">Are you sure?</h2>
+    <p class="confirm-message" id="confirmMessage"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-delete" id="confirmOkBtn">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -227,6 +335,14 @@
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
   const BOARD_LABELS = { vboost: 'V-Boost', ts: 'T&S', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct' }
+  const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30 }
+  function isDirectBoard(board) { return board === 'vboost_direct' || board === 'ts_direct' }
+  function levelsFor(board) {
+    const n = BOARD_LEVEL_COUNTS[board]
+    const levels = Array.from({ length: n }, (_, i) => n - i) // highest down to 1
+    if (isDirectBoard(board)) levels.push(0) // Direct boards also have a "0 Direct" level
+    return levels
+  }
   // "Direct" boards share their parent board's identifier format
   // (vboost_direct -> Passport NFT, ts_direct -> Link ID).
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
@@ -272,6 +388,7 @@
     signedInEmail.textContent = session.user.email
     loadRequests()
     loadMembers()
+    loadEditRequests()
     if (!realtimeChannel) {
       realtimeChannel = supabase
         .channel('requests-changes')
@@ -280,6 +397,9 @@
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => {
           loadMembers()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'edit_requests' }, () => {
+          loadEditRequests()
         })
         .subscribe()
     }
@@ -343,18 +463,21 @@
   const countMembers = document.getElementById('countMembers')
   const countRejected = document.getElementById('countRejected')
   const countRequests = document.getElementById('countRequests')
+  const countEditRequests = document.getElementById('countEditRequests')
 
-  // Keeps the two view-tab counts (Pending Requests / Rejected) in sync with
-  // allRequests — called any time that array changes.
+  // Keeps the view-tab counts (Pending Requests / Rejected / Edit Requests) in sync
+  // with their arrays — called any time one of those arrays changes.
   function updateViewTabCounts() {
     countRequests.textContent = allRequests.filter((r) => (r.status || 'pending') === 'pending').length
     countRejected.textContent = allRequests.filter((r) => r.status === 'rejected').length
+    countEditRequests.textContent = allEditRequests.length
   }
 
   let allRequests = []
   let allMembers = []
+  let allEditRequests = []
   let currentBoard = 'vboost'
-  let currentView = 'requests' // 'requests' | 'rejected' | 'members'
+  let currentView = 'requests' // 'requests' | 'rejected' | 'members' | 'editRequests'
 
   function timeAgo(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime()
@@ -418,6 +541,26 @@
     render()
   }
 
+  async function loadEditRequests() {
+    const { data, error } = await supabase
+      .from('edit_requests')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Failed to load edit requests:', error)
+      allEditRequests = []
+      updateViewTabCounts()
+      updateTabCounts()
+      render()
+      return
+    }
+    allEditRequests = data
+    updateViewTabCounts()
+    updateTabCounts()
+    render()
+  }
+
   function updateTabCounts() {
     for (const board of Object.keys(BOARD_LABELS)) {
       const el = BOARD_COUNT_ELS[board]
@@ -426,6 +569,8 @@
         el.textContent = allMembers.filter((m) => m.board === board).length
       } else if (currentView === 'rejected') {
         el.textContent = allRequests.filter((r) => r.board === board && r.status === 'rejected').length
+      } else if (currentView === 'editRequests') {
+        el.textContent = allEditRequests.filter((r) => r.board === board).length
       } else {
         el.textContent = allRequests.filter((r) => r.board === board && (r.status || 'pending') === 'pending').length
       }
@@ -460,6 +605,10 @@
     return allMembers.filter((m) => m.board === currentBoard)
   }
 
+  function currentEditRequests() {
+    return allEditRequests.filter((r) => r.board === currentBoard)
+  }
+
   // Every request now renders as a full-width row showing all its details at once —
   // Hall of Fame photo, proof photo, name, district, phone, board identifier, level and submitted time —
   // with no click-to-expand step needed. Clicking the Hall of Fame thumbnail opens it
@@ -473,6 +622,8 @@
       renderMembers()
     } else if (currentView === 'rejected') {
       renderRejected()
+    } else if (currentView === 'editRequests') {
+      renderEditRequests()
     } else {
       renderRequests()
     }
@@ -608,7 +759,17 @@
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
       row.querySelectorAll('.request-actions button').forEach((btn) => {
-        btn.addEventListener('click', () => handleAction(btn.dataset.id, btn.dataset.action, btn))
+        if (btn.dataset.action === 'delete') {
+          btn.addEventListener('click', () => openConfirm({
+            title: 'Delete permanently?',
+            message: `This will permanently delete ${req.name}'s rejected request and photos. This can't be undone.`,
+            confirmLabel: 'Delete permanently',
+            danger: true,
+            onConfirm: () => handleAction(btn.dataset.id, btn.dataset.action, btn),
+          }))
+        } else {
+          btn.addEventListener('click', () => handleAction(btn.dataset.id, btn.dataset.action, btn))
+        }
       })
       listEl.appendChild(row)
     }
@@ -661,16 +822,179 @@
           </div>
         </div>
         <div class="request-actions">
+          <button class="btn btn-edit" data-id="${m.id}" data-action="edit">Edit</button>
           <button class="btn btn-remove" data-id="${m.id}" data-action="remove">Remove</button>
         </div>
       `
       row.querySelectorAll('.request-photos img').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
-      row.querySelectorAll('.request-actions button').forEach((btn) => {
-        btn.addEventListener('click', () => handleMemberRemove(btn.dataset.id, btn))
+      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(m))
+      row.querySelector('[data-action="remove"]').addEventListener('click', (e) => {
+        const btnEl = e.currentTarget
+        openConfirm({
+          title: 'Remove member?',
+          message: `This will remove ${m.name} from the ${BOARD_LABELS[m.board] || m.board} roster and delete their photo. This can't be undone.`,
+          confirmLabel: 'Remove',
+          danger: true,
+          onConfirm: () => handleMemberRemove(m.id, btnEl),
+        })
       })
       listEl.appendChild(row)
+    }
+  }
+
+  // A field row for an edit request: shows the old value struck through above the
+  // proposed new value when it actually changed, or just the value once if it didn't.
+  function editReqFieldHtml(label, oldVal, newVal) {
+    const changed = (oldVal || '') !== (newVal || '')
+    const oldDisplay = oldVal ? escapeHtml(oldVal) : '—'
+    const newDisplay = newVal ? escapeHtml(newVal) : '—'
+    return `
+      <div>
+        <div class="request-field-label">${label}</div>
+        ${changed
+          ? `<div class="editreq-value-old">${oldDisplay}</div><div class="editreq-value-new">${newDisplay}</div>`
+          : `<div class="editreq-value-unchanged">${newDisplay}</div>`}
+      </div>
+    `
+  }
+
+  // Edit requests — a member proposed a change from the public site (via the Edit
+  // button on their ID card). Shows old vs. new per field; Accept applies the new
+  // values to the member row, Reject discards the request untouched.
+  function renderEditRequests() {
+    const reqs = currentEditRequests()
+    headerSub.textContent = `${reqs.length} edit request${reqs.length === 1 ? '' : 's'} awaiting review in ${BOARD_LABELS[currentBoard]}`
+    emptyState.textContent = 'No edit requests right now.'
+    emptyState.style.display = reqs.length === 0 ? 'block' : 'none'
+    listEl.innerHTML = ''
+
+    for (const r of reqs) {
+      const photoChanged = r.new_photo_url && r.new_photo_url !== r.old_photo_url
+      const row = document.createElement('div')
+      row.className = 'request-row'
+      row.innerHTML = `
+        <div class="request-photos">
+          <div class="request-photo-block">
+            <img src="${escapeHtml(r.old_photo_url)}" alt="Current photo" data-full="${escapeHtml(r.old_photo_url)}" />
+            <div class="request-photo-tag">Current</div>
+          </div>
+          ${photoChanged ? `
+          <div class="editreq-photo-arrow">→</div>
+          <div class="request-photo-block">
+            <img src="${escapeHtml(r.new_photo_url)}" alt="Proposed photo" data-full="${escapeHtml(r.new_photo_url)}" />
+            <div class="request-photo-tag">Proposed</div>
+          </div>` : ''}
+        </div>
+        <div class="request-fields">
+          ${editReqFieldHtml('Name', r.old_name, r.new_name)}
+          ${editReqFieldHtml('District', r.old_district, r.new_district)}
+          ${editReqFieldHtml('WhatsApp', r.old_phone, r.new_phone)}
+          ${editReqFieldHtml(isTsBoard(r.board) ? 'Link ID' : 'Passport NFT', r.old_passport_nft, r.new_passport_nft)}
+          <div>
+            <div class="request-field-label">Requested</div>
+            <div class="request-field-value">${timeAgo(r.created_at)}</div>
+          </div>
+        </div>
+        <div class="request-actions">
+          <button class="btn btn-accept-changes" data-id="${r.id}" data-action="accept">Accept changes</button>
+          <button class="btn btn-reject-changes" data-id="${r.id}" data-action="reject">Remove changes</button>
+        </div>
+      `
+      row.querySelectorAll('.request-photos img').forEach((img) => {
+        img.addEventListener('click', () => openLightbox(img.dataset.full))
+      })
+      row.querySelectorAll('.request-actions button').forEach((btn) => {
+        btn.addEventListener('click', () => handleEditRequestAction(btn.dataset.id, btn.dataset.action, btn))
+      })
+      listEl.appendChild(row)
+    }
+  }
+
+  async function handleEditRequestAction(id, action, btnEl) {
+    const req = allEditRequests.find((r) => r.id === id)
+    if (!req) return
+
+    const row = btnEl.closest('.request-row')
+    if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = true))
+
+    if (action === 'accept') {
+      // Guard against the proposed identifier colliding with a different member
+      // already on this board before applying it.
+      if (req.new_passport_nft && req.new_passport_nft !== req.old_passport_nft) {
+        const { data: dupeRows, error: dupeErr } = await supabase
+          .from('members')
+          .select('id, level')
+          .eq('board', req.board)
+          .eq('passport_nft', req.new_passport_nft)
+          .limit(1)
+        if (dupeErr) {
+          console.error(dupeErr)
+          showToast('Could not verify the identifier — try again.')
+          if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+          return
+        }
+        if (dupeRows && dupeRows.length && dupeRows[0].id !== req.member_id) {
+          showToast(`${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'} ${req.new_passport_nft} is already used by another member in ${BOARD_LABELS[req.board]} Level ${dupeRows[0].level}.`)
+          if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+          return
+        }
+      }
+
+      const updates = {
+        name: req.new_name,
+        district: req.new_district,
+        phone: req.new_phone,
+        passport_nft: req.new_passport_nft,
+      }
+      if (req.new_photo_url) updates.photo_url = req.new_photo_url
+
+      const { error: updateError } = await supabase.from('members').update(updates).eq('id', req.member_id)
+      if (updateError) {
+        console.error(updateError)
+        if (updateError.code === '23505') {
+          showToast(`${isTsBoard(req.board) ? 'Link ID' : 'Passport NFT'} is already in use on this board.`)
+        } else {
+          showToast('Could not apply changes — try again.')
+        }
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+
+      const { error: deleteError } = await supabase.from('edit_requests').delete().eq('id', req.id)
+      if (deleteError) console.error(deleteError)
+
+      // The old photo is only replaced once the new one is confirmed live on the
+      // member row — clean it up now that nothing references it anymore.
+      if (req.new_photo_url && req.old_photo_url) deleteFromStorage(req.old_photo_url)
+
+      const idx = allMembers.findIndex((m) => m.id === req.member_id)
+      if (idx !== -1) allMembers[idx] = { ...allMembers[idx], ...updates }
+
+      allEditRequests = allEditRequests.filter((r) => r.id !== id)
+      showToast(`Applied changes for ${req.new_name}`)
+      updateTabCounts()
+      updateViewTabCounts()
+      render()
+    } else if (action === 'reject') {
+      const { error } = await supabase.from('edit_requests').delete().eq('id', req.id)
+      if (error) {
+        console.error(error)
+        showToast('Could not remove — try again.')
+        if (row) row.querySelectorAll('button').forEach((b) => (b.disabled = false))
+        return
+      }
+
+      // The proposed photo (if any) was only uploaded for this review — clean it up
+      // since it's being discarded and nothing will ever reference it.
+      if (req.new_photo_url) deleteFromStorage(req.new_photo_url)
+
+      allEditRequests = allEditRequests.filter((r) => r.id !== id)
+      showToast('Edit request removed')
+      updateTabCounts()
+      updateViewTabCounts()
+      render()
     }
   }
 
@@ -690,6 +1014,40 @@
   lightboxClose.addEventListener('click', closeLightbox)
   lightboxOverlay.addEventListener('click', (e) => {
     if (e.target === lightboxOverlay) closeLightbox()
+  })
+
+  // ---- Confirm modal ----
+  const confirmOverlay = document.getElementById('confirmOverlay')
+  const confirmTitleEl = document.getElementById('confirmTitle')
+  const confirmMessageEl = document.getElementById('confirmMessage')
+  const confirmCancelBtn = document.getElementById('confirmCancelBtn')
+  const confirmOkBtn = document.getElementById('confirmOkBtn')
+
+  let confirmCallback = null
+
+  function openConfirm({ title, message, confirmLabel = 'Confirm', danger = true, onConfirm }) {
+    confirmTitleEl.textContent = title
+    confirmMessageEl.textContent = message
+    confirmOkBtn.textContent = confirmLabel
+    confirmOkBtn.className = danger ? 'btn btn-delete' : 'btn btn-primary'
+    confirmCallback = onConfirm
+    confirmOverlay.classList.add('open')
+  }
+
+  function closeConfirm() {
+    confirmOverlay.classList.remove('open')
+    confirmCallback = null
+  }
+
+  confirmCancelBtn.addEventListener('click', closeConfirm)
+  confirmOverlay.addEventListener('click', (e) => { if (e.target === confirmOverlay) closeConfirm() })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && confirmOverlay.classList.contains('open')) closeConfirm()
+  })
+  confirmOkBtn.addEventListener('click', () => {
+    const cb = confirmCallback
+    closeConfirm()
+    if (cb) cb()
   })
 
   async function handleAction(id, action, btnEl) {
@@ -839,6 +1197,189 @@
     updateTabCounts()
     render()
   }
+
+  // ---- Edit member modal ----
+  const editOverlay = document.getElementById('editOverlay')
+  const editModalSub = document.getElementById('editModalSub')
+  const editError = document.getElementById('editError')
+  const editPhotoPreview = document.getElementById('editPhotoPreview')
+  const editPhotoInput = document.getElementById('editPhotoInput')
+  const editNameInput = document.getElementById('editNameInput')
+  const editDistrictInput = document.getElementById('editDistrictInput')
+  const editPhoneInput = document.getElementById('editPhoneInput')
+  const editIdentifierLabel = document.getElementById('editIdentifierLabel')
+  const editIdentifierInput = document.getElementById('editIdentifierInput')
+  const editLevelInput = document.getElementById('editLevelInput')
+  const editCancelBtn = document.getElementById('editCancelBtn')
+  const editSaveBtn = document.getElementById('editSaveBtn')
+
+  const MAX_EDIT_PHOTO_BYTES = 500 * 1024 // 500 KB, matches the public site's limit
+
+  let editingMember = null
+  let editNewPhotoFile = null // set only if the admin picks a replacement photo
+
+  function identifierIsValidFor(board, value) {
+    if (isTsBoard(board)) return /^[A-Za-z0-9]{10}$/.test(value)
+    return /^[0-9]{5}$/.test(value)
+  }
+
+  function showEditError(msg) {
+    editError.textContent = msg
+    editError.style.display = 'block'
+  }
+
+  function openEditModal(member) {
+    editingMember = member
+    editNewPhotoFile = null
+    editError.style.display = 'none'
+    editModalSub.textContent = `${BOARD_LABELS[member.board] || member.board} · currently Level ${member.level}`
+
+    editPhotoPreview.src = member.photo_url
+    editPhotoInput.value = ''
+    editNameInput.value = member.name || ''
+    editDistrictInput.value = member.district || ''
+    editPhoneInput.value = member.phone || ''
+
+    editIdentifierLabel.textContent = isTsBoard(member.board) ? 'Link ID' : 'Passport NFT'
+    editIdentifierInput.value = member.passport_nft || ''
+    editIdentifierInput.maxLength = isTsBoard(member.board) ? 10 : 5
+
+    editLevelInput.innerHTML = ''
+    levelsFor(member.board).forEach((lvl) => {
+      const opt = document.createElement('option')
+      opt.value = String(lvl)
+      opt.textContent = isDirectBoard(member.board) ? `${lvl} Direct` : `Level ${lvl}`
+      if (lvl === member.level) opt.selected = true
+      editLevelInput.appendChild(opt)
+    })
+
+    editSaveBtn.disabled = false
+    editSaveBtn.textContent = 'Save changes'
+    editOverlay.classList.add('open')
+  }
+
+  function closeEditModal() {
+    editOverlay.classList.remove('open')
+    editingMember = null
+    editNewPhotoFile = null
+  }
+
+  editCancelBtn.addEventListener('click', closeEditModal)
+  editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) closeEditModal() })
+
+  editPhotoInput.addEventListener('change', () => {
+    const file = editPhotoInput.files[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      editPhotoInput.value = ''
+      showEditError('Please choose an image file.')
+      return
+    }
+    if (file.size > MAX_EDIT_PHOTO_BYTES) {
+      editPhotoInput.value = ''
+      showEditError(`That photo is ${(file.size / 1024).toFixed(0)} KB — please choose one under 500 KB.`)
+      return
+    }
+    editError.style.display = 'none'
+    editNewPhotoFile = file
+    editPhotoPreview.src = URL.createObjectURL(file)
+  })
+
+  async function uploadEditPhoto(file, board, level) {
+    const ext = (file.name && file.name.split('.').pop()) || 'jpg'
+    const path = `${board}/${level}/${crypto.randomUUID()}.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, file, { cacheControl: '3600', upsert: false })
+    if (uploadError) throw uploadError
+    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path)
+    return data.publicUrl
+  }
+
+  editSaveBtn.addEventListener('click', async () => {
+    if (!editingMember) return
+    editError.style.display = 'none'
+
+    const name = editNameInput.value.trim()
+    const district = editDistrictInput.value.trim()
+    const phone = editPhoneInput.value.trim()
+    const identifier = editIdentifierInput.value.trim()
+    const level = Number(editLevelInput.value)
+    const board = editingMember.board
+
+    if (!name) { showEditError('Please enter the full name.'); return }
+    if (!district) { showEditError('Please enter the district.'); return }
+    if (!phone) { showEditError('Please enter a WhatsApp number.'); return }
+    if (!identifierIsValidFor(board, identifier)) {
+      showEditError(isTsBoard(board) ? 'Link ID must be exactly 10 characters.' : 'Passport NFT must be exactly 5 digits.')
+      return
+    }
+
+    editSaveBtn.disabled = true
+    editSaveBtn.textContent = 'Saving…'
+
+    try {
+      // If the identifier changed, make sure it doesn't collide with a different
+      // member already using it on this board (the DB's unique (board, passport_nft)
+      // constraint would catch this too, but checking first gives a clearer message).
+      if (identifier !== editingMember.passport_nft) {
+        const { data: dupeRows, error: dupeErr } = await supabase
+          .from('members')
+          .select('id, level')
+          .eq('board', board)
+          .eq('passport_nft', identifier)
+          .limit(1)
+        if (dupeErr) throw dupeErr
+        if (dupeRows && dupeRows.length && dupeRows[0].id !== editingMember.id) {
+          showEditError(`${isTsBoard(board) ? 'Link ID' : 'Passport NFT'} ${identifier} is already used by another member in ${BOARD_LABELS[board]} Level ${dupeRows[0].level}.`)
+          editSaveBtn.disabled = false
+          editSaveBtn.textContent = 'Save changes'
+          return
+        }
+      }
+
+      const updates = { name, district, phone, passport_nft: identifier, level }
+
+      if (editNewPhotoFile) {
+        updates.photo_url = await uploadEditPhoto(editNewPhotoFile, board, level)
+      }
+
+      const { error: updateError } = await supabase
+        .from('members')
+        .update(updates)
+        .eq('id', editingMember.id)
+
+      if (updateError) {
+        if (updateError.code === '23505') {
+          showEditError(`${isTsBoard(board) ? 'Link ID' : 'Passport NFT'} ${identifier} is already in use on this board.`)
+        } else {
+          throw updateError
+        }
+        editSaveBtn.disabled = false
+        editSaveBtn.textContent = 'Save changes'
+        return
+      }
+
+      // New photo saved successfully — clean up the old file from storage now
+      // that nothing references it anymore.
+      if (editNewPhotoFile && editingMember.photo_url) {
+        deleteFromStorage(editingMember.photo_url)
+      }
+
+      const idx = allMembers.findIndex((m) => m.id === editingMember.id)
+      if (idx !== -1) allMembers[idx] = { ...allMembers[idx], ...updates }
+
+      showToast(`Saved changes for ${name}`)
+      closeEditModal()
+      updateTabCounts()
+      render()
+    } catch (err) {
+      console.error(err)
+      showEditError(err.message || 'Could not save changes — please try again.')
+      editSaveBtn.disabled = false
+      editSaveBtn.textContent = 'Save changes'
+    }
+  })
 
   // Init + realtime are wired up above via showApp(), triggered once
   // supabase.auth.getSession() / onAuthStateChange finds a valid session.
