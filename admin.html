@@ -343,6 +343,11 @@
       <input type="date" id="editJoinedAtInput" />
     </div>
 
+    <div class="edit-field" id="editLevelAtField">
+      <label id="editLevelAtLabel">Level date</label>
+      <input type="date" id="editLevelAtInput" />
+    </div>
+
     <div class="edit-actions">
       <button type="button" class="btn btn-secondary" id="editCancelBtn">Cancel</button>
       <button type="button" class="btn btn-primary" id="editSaveBtn">Save changes</button>
@@ -394,6 +399,14 @@
   // Level boards and their paired Direct board (vboost <-> vboost_direct, ts <-> ts_direct)
   // are allowed to share the same NFT/ID — no duplicate block between the two.
   function isPairedBoard(boardA, boardB) { return boardA !== boardB && isTsBoard(boardA) === isTsBoard(boardB) }
+  // Label for the level-specific date, e.g. "Unlocked V-Boost Level 5" /
+  // "Reached T&S 5 Direct" — mirrors levelDateCaption on index.html.
+  function levelDateLabelText(board, level) {
+    const shortName = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    return isDirectBoard(board)
+      ? `Reached ${shortName} ${level} Direct`
+      : `Unlocked ${shortName} Level ${level}`
+  }
 
   // ---- Storage cleanup helper ----
   // Request photos are uploaded straight to the "member-photos" bucket by the
@@ -736,7 +749,11 @@
           </div>
           <div>
             <div class="request-field-label">Joined Vistory</div>
-            <div class="request-field-value">${formatJoinedDate(req.joined_at)}</div>
+            <div class="request-field-value">${req.is_upgrade ? '— (kept from existing member)' : formatJoinedDate(req.joined_at)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">${levelDateLabelText(req.board, req.level)}</div>
+            <div class="request-field-value">${formatJoinedDate(req.level_at)}</div>
           </div>
           <div>
             <div class="request-field-label">Submitted</div>
@@ -812,7 +829,11 @@
           </div>
           <div>
             <div class="request-field-label">Joined Vistory</div>
-            <div class="request-field-value">${formatJoinedDate(req.joined_at)}</div>
+            <div class="request-field-value">${req.is_upgrade ? '— (kept from existing member)' : formatJoinedDate(req.joined_at)}</div>
+          </div>
+          <div>
+            <div class="request-field-label">${levelDateLabelText(req.board, req.level)}</div>
+            <div class="request-field-value">${formatJoinedDate(req.level_at)}</div>
           </div>
           <div>
             <div class="request-field-label">Rejected</div>
@@ -892,6 +913,10 @@
             <div class="request-field-value">${formatJoinedDate(m.joined_at)}</div>
           </div>
           <div>
+            <div class="request-field-label">${levelDateLabelText(m.board, m.level)}</div>
+            <div class="request-field-value">${formatJoinedDate(m.level_at)}</div>
+          </div>
+          <div>
             <div class="request-field-label">Member since</div>
             <div class="request-field-value">${timeAgo(m.created_at)}</div>
           </div>
@@ -947,6 +972,10 @@
 
     for (const r of reqs) {
       const photoChanged = r.new_photo_url && r.new_photo_url !== r.old_photo_url
+      // The edit_requests table doesn't store a level (it never proposes a
+      // level change) — look the member up to get one for the date label.
+      const reqMember = allMembers.find((m) => m.id === r.member_id)
+      const levelAtFieldLabel = reqMember ? levelDateLabelText(r.board, reqMember.level) : 'Level date'
       const row = document.createElement('div')
       row.className = 'request-row'
       row.innerHTML = `
@@ -968,6 +997,7 @@
           ${editReqFieldHtml('WhatsApp', r.old_phone, r.new_phone)}
           ${editReqFieldHtml(isTsBoard(r.board) ? 'Link ID' : 'Passport NFT', r.old_passport_nft, r.new_passport_nft)}
           ${editReqFieldHtml('Joined Vistory', formatJoinedDate(r.old_joined_at), formatJoinedDate(r.new_joined_at))}
+          ${editReqFieldHtml(levelAtFieldLabel, formatJoinedDate(r.old_level_at), formatJoinedDate(r.new_level_at))}
           <div>
             <div class="request-field-label">Requested</div>
             <div class="request-field-value">${timeAgo(r.created_at)}</div>
@@ -983,8 +1013,18 @@
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
       row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(r, 'editRequest'))
-      row.querySelectorAll('.request-actions button:not([data-action="edit"])').forEach((btn) => {
-        btn.addEventListener('click', () => handleEditRequestAction(btn.dataset.id, btn.dataset.action, btn))
+      row.querySelector('[data-action="accept"]').addEventListener('click', (e) => {
+        handleEditRequestAction(r.id, 'accept', e.currentTarget)
+      })
+      row.querySelector('[data-action="reject"]').addEventListener('click', (e) => {
+        const btnEl = e.currentTarget
+        openConfirm({
+          title: 'Remove these changes?',
+          message: `This will discard ${r.new_name || r.old_name || 'this member'}'s proposed changes. Their member row stays untouched. This can't be undone.`,
+          confirmLabel: 'Remove changes',
+          danger: true,
+          onConfirm: () => handleEditRequestAction(r.id, 'reject', btnEl),
+        })
       })
       listEl.appendChild(row)
     }
@@ -1026,6 +1066,7 @@
         phone: req.new_phone,
         passport_nft: req.new_passport_nft,
         joined_at: req.new_joined_at,
+        level_at: req.new_level_at,
       }
       if (req.new_photo_url) updates.photo_url = req.new_photo_url
 
@@ -1172,6 +1213,12 @@
         deleteFromStorage(dupe.photo_url)
       }
 
+      // On an upgrade the request form no longer asks for "joined Vistory" (it's
+      // already set on the member being replaced) — carry it over from the row
+      // we're about to delete instead of using req.joined_at (which is null).
+      const isUpgradeAccept = req.is_upgrade && dupeRows && dupeRows.length
+      const carriedJoinedAt = isUpgradeAccept ? dupeRows[0].joined_at : req.joined_at
+
       const { error: insertError } = await supabase.from('members').insert({
         board: req.board,
         level: req.level,
@@ -1183,11 +1230,14 @@
         // Preserve the date the member originally submitted their request —
         // kept as a fallback for older rows that predate joined_at.
         submitted_at: req.created_at,
-        // The date the member says they joined Vistory (entered by them
-        // on the request form) — this is what's shown publicly on the Hall of
-        // Fame page as "Joined Vistory on ...", not the moment an admin
-        // got around to accepting the request.
-        joined_at: req.joined_at,
+        // The date the member says they joined Vistory — entered by them on
+        // the request form for a fresh registration, or carried over from
+        // their previous member row on an upgrade. This is what's shown
+        // publicly on the Hall of Fame page as "Joined Vistory on ...".
+        joined_at: carriedJoinedAt,
+        // The date they unlocked/reached this specific level — always comes
+        // from the request, upgrade or not.
+        level_at: req.level_at,
       })
       if (insertError) {
         console.error(insertError)
@@ -1304,6 +1354,9 @@
   const editLevelField = document.getElementById('editLevelField')
   const editLevelInput = document.getElementById('editLevelInput')
   const editJoinedAtInput = document.getElementById('editJoinedAtInput')
+  const editLevelAtField = document.getElementById('editLevelAtField')
+  const editLevelAtLabel = document.getElementById('editLevelAtLabel')
+  const editLevelAtInput = document.getElementById('editLevelAtInput')
   const editCancelBtn = document.getElementById('editCancelBtn')
   const editSaveBtn = document.getElementById('editSaveBtn')
 
@@ -1328,38 +1381,41 @@
   function editKindConfig(kind) {
     if (kind === 'member') {
       return {
-        table: 'members', title: 'Edit member', showLevel: true, photoField: 'photo_url',
+        table: 'members', title: 'Edit member', showLevel: true, showLevelAt: true, photoField: 'photo_url',
         arrayRef: () => allMembers,
-        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, photo_url: r.photo_url }),
-        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at }),
+        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, level_at: r.level_at, photo_url: r.photo_url }),
+        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at, level_at: f.level_at }),
         getCleanupPhoto: (r) => r.photo_url,
         getSelfMemberId: (r) => r.id,
       }
     }
     if (kind === 'request' || kind === 'rejected') {
       return {
-        table: 'requests', title: kind === 'rejected' ? 'Edit rejected request' : 'Edit request', showLevel: true, photoField: 'photo_url',
+        table: 'requests', title: kind === 'rejected' ? 'Edit rejected request' : 'Edit request', showLevel: true, showLevelAt: true, photoField: 'photo_url',
         arrayRef: () => allRequests,
-        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, photo_url: r.photo_url }),
-        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at }),
+        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, level_at: r.level_at, photo_url: r.photo_url }),
+        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at, level_at: f.level_at }),
         getCleanupPhoto: (r) => r.photo_url,
         getSelfMemberId: () => null,
       }
     }
-    // editRequest
+    // editRequest — the level itself is never proposed here (looked up from
+    // the live member row just for the date field's label), but the level
+    // date IS one of the proposable fields (new_level_at), same as joined_at.
     return {
-      table: 'edit_requests', title: 'Edit proposed changes', showLevel: false, photoField: 'new_photo_url',
+      table: 'edit_requests', title: 'Edit proposed changes', showLevel: false, showLevelAt: true, photoField: 'new_photo_url',
       arrayRef: () => allEditRequests,
       getFields: (r) => ({
         name: r.new_name || r.old_name,
         district: r.new_district != null ? r.new_district : r.old_district,
         phone: r.new_phone || r.old_phone,
         passport_nft: r.new_passport_nft || r.old_passport_nft,
-        level: null,
+        level: (allMembers.find((m) => m.id === r.member_id) || {}).level ?? null,
         joined_at: r.new_joined_at != null ? r.new_joined_at : r.old_joined_at,
+        level_at: r.new_level_at != null ? r.new_level_at : r.old_level_at,
         photo_url: r.new_photo_url || r.old_photo_url,
       }),
-      buildUpdates: (f) => ({ new_name: f.name, new_district: f.district, new_phone: f.phone, new_passport_nft: f.passport_nft, new_joined_at: f.joined_at }),
+      buildUpdates: (f) => ({ new_name: f.name, new_district: f.district, new_phone: f.phone, new_passport_nft: f.passport_nft, new_joined_at: f.joined_at, new_level_at: f.level_at }),
       // Only clean up a *previously proposed* photo — never the member's
       // current old_photo_url, since that's still live on their member row.
       getCleanupPhoto: (r) => r.new_photo_url || null,
@@ -1418,6 +1474,16 @@
     editJoinedAtInput.max = new Date().toISOString().slice(0, 10)
     editJoinedAtInput.value = f.joined_at || ''
 
+    // The level-specific date applies wherever there's a level to attach it
+    // to — either directly editable here (members/requests) or looked up
+    // from the live member row for its label (edit requests).
+    editLevelAtField.style.display = config.showLevelAt ? '' : 'none'
+    if (config.showLevelAt) {
+      editLevelAtLabel.textContent = f.level != null ? levelDateLabelText(record.board, f.level) : 'Level date'
+      editLevelAtInput.max = new Date().toISOString().slice(0, 10)
+      editLevelAtInput.value = f.level_at || ''
+    }
+
     editSaveBtn.disabled = false
     editSaveBtn.textContent = 'Save changes'
     editOverlay.classList.add('open')
@@ -1435,6 +1501,10 @@
 
   editCancelBtn.addEventListener('click', closeEditModal)
   editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) closeEditModal() })
+  editLevelInput.addEventListener('change', () => {
+    if (!editingRecord) return
+    editLevelAtLabel.textContent = levelDateLabelText(editingRecord.board, Number(editLevelInput.value))
+  })
 
   // ---- Photo adjustment (crop/zoom) tool for the edit-member photo ----
   const EDIT_CROP_SIZE = 220
@@ -1598,6 +1668,7 @@
     const board = editingRecord.board
     const level = config.showLevel ? Number(editLevelInput.value) : null
     const joinedAt = editJoinedAtInput.value || null
+    const levelAt = config.showLevelAt ? (editLevelAtInput.value || null) : null
 
     if (!name) { showEditError('Please enter the full name.'); return }
     if (!district) { showEditError('Please enter the district.'); return }
@@ -1608,6 +1679,10 @@
     }
     if (joinedAt && joinedAt > new Date().toISOString().slice(0, 10)) {
       showEditError("Joined Vistory date can't be in the future.")
+      return
+    }
+    if (levelAt && levelAt > new Date().toISOString().slice(0, 10)) {
+      showEditError(`${editLevelAtLabel.textContent} date can't be in the future.`)
       return
     }
 
@@ -1640,7 +1715,7 @@
         }
       }
 
-      const updates = config.buildUpdates({ name, district, phone, passport_nft: identifier, level, joined_at: joinedAt })
+      const updates = config.buildUpdates({ name, district, phone, passport_nft: identifier, level, joined_at: joinedAt, level_at: levelAt })
       const photoToCleanup = config.getCleanupPhoto(editingRecord)
 
       if (editNewPhotoFile) {
