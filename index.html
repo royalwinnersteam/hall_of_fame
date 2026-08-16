@@ -175,6 +175,11 @@
     max-width: calc(var(--card-size) + 46px); white-space: normal; overflow: visible; line-height: 1.3;
     margin-top: 2px; letter-spacing: 0.01em;
   }
+  .photo-date-level { color: var(--gold); }
+  .photo-date-level .date-value {
+    font-size: 15px; font-weight: 800; letter-spacing: 0.02em;
+    text-shadow: 0 0 10px rgba(232, 182, 90, 0.45);
+  }
   .photo-new-badge {
     display: inline-flex; align-items: center; justify-content: center;
     margin-top: 2px; padding: 2px 8px; border-radius: 999px;
@@ -345,6 +350,11 @@
   .idcard-name { font-family: var(--font-display); font-size: 19px; color: var(--gold); margin-bottom: 4px; }
   .idcard-district { font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
   .idcard-date { font-family: var(--font-mono); font-size: 12px; color: var(--whale-blue); margin-bottom: 10px; }
+  .idcard-date-level { color: var(--gold); margin-top: -6px; }
+  .idcard-date-level .date-value {
+    font-size: 20px; font-weight: 800; letter-spacing: 0.01em;
+    text-shadow: 0 0 12px rgba(232, 182, 90, 0.5);
+  }
   .idcard-level { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.15; margin-bottom: 12px; }
   .idcard-level-board { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .idcard-level-value { font-family: var(--font-display); font-size: 20px; color: var(--gold); }
@@ -557,16 +567,24 @@
         </div>
       </div>
 
-      <!-- Step 6: date joined Vistory — this is the date shown on the public
-           Hall of Fame card ("Joined Vistory on ..."), set by the member
-           rather than defaulting to whenever the admin happens to accept the request -->
+      <!-- Step 6: date(s) shown on the public Hall of Fame card.
+           - New registration: asks BOTH "Date joined Vistory" AND the
+             level-specific date ("Date you unlocked ... Level XX" /
+             "Date you reached ... XX Direct").
+           - Upgrade: "Date joined Vistory" is kept from the existing
+             member row (not re-asked) — only the level-specific date
+             is asked here. -->
       <div class="wizard-step" data-step="6">
         <div class="step-label">Step 7 of 7</div>
-        <h3 class="step-heading">Date you joined Vistory</h3>
-        <p class="step-hint">This is the date that will be shown publicly on your Hall of Fame card.</p>
-        <div class="field">
+        <h3 class="step-heading" id="dateStepHeading">Dates</h3>
+        <p class="step-hint" id="dateStepHint">These dates will be shown publicly on your Hall of Fame card.</p>
+        <div class="field" id="joinedDateField">
           <label>Date joined Vistory</label>
           <input type="date" id="joinedDateInput" />
+        </div>
+        <div class="field" id="levelDateField">
+          <label id="levelDateLabel">Date you unlocked Level</label>
+          <input type="date" id="levelDateInput" />
         </div>
       </div>
 
@@ -606,6 +624,7 @@
         <div class="idcard-name" id="idCardName"></div>
         <div class="idcard-district" id="idCardDistrict"></div>
         <div class="idcard-date" id="idCardDate"></div>
+        <div class="idcard-date idcard-date-level" id="idCardLevelDate" style="display:none;"></div>
         <div class="idcard-days" id="idCardDays" style="display:none;"></div>
       </div>
       <div class="idcard-footer">Royal Spark Winners Team</div>
@@ -725,6 +744,12 @@
         <div class="field-hint">Leave it as it is to keep the same date.</div>
       </div>
 
+      <div class="field">
+        <label id="editReqLevelAtLabel">Level date</label>
+        <input type="date" id="editReqLevelAtInput" />
+        <div class="field-hint">Leave it as it is to keep the same date.</div>
+      </div>
+
       <p class="form-error" id="editReqError"></p>
 
       <div class="modal-actions">
@@ -795,7 +820,7 @@
 
   let lastMembersSignature = null
   function membersSignature(rows) {
-    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}:${r.submitted_at}:${r.joined_at}`).sort().join('|')
+    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}:${r.submitted_at}:${r.joined_at}:${r.level_at}`).sort().join('|')
   }
 
   async function loadMembers() {
@@ -924,6 +949,28 @@
     return dateLabel ? `Joined Vistory on ${dateLabel}` : ''
   }
 
+  // The second date shown under each photo / on the ID card: when the member
+  // unlocked this specific level (Level boards) or reached this Direct level
+  // (Direct boards). Only rendered when the row actually has a level_at —
+  // older rows that predate this field just show the one "Joined Vistory"
+  // line, same as before.
+  function levelDateCaption(m) {
+    const dateLabel = formatDisplayDate(m.level_at)
+    if (!dateLabel) return ''
+    const shortName = isTsBoard(m.board) ? 'T&S' : 'V-Boost'
+    const line = isDirectBoard(m.board)
+      ? `Reached ${shortName} ${m.level} Direct`
+      : `Unlocked ${shortName} Level ${m.level}`
+    return `${line} on <span class="date-value">${dateLabel}</span>`
+  }
+
+  // "No. of Days" is counted from the level date (level_at) when present —
+  // that's the date most relevant to *this* level/badge. Rows that predate
+  // level_at fall back to the same join-date basis used before.
+  function memberDaysBasis(m) {
+    return m.level_at || memberDisplayDate(m)
+  }
+
   function isSameLocalDay(dateStr, ref) {
     if (!dateStr) return false
     const d = new Date(dateStr)
@@ -946,17 +993,19 @@
   }
 
   function renderPhotoCard(m) {
-    const displayDate = memberDisplayDate(m)
     const dateLabel = joinedLabel(m)
+    const levelDateLabelText2 = levelDateCaption(m)
+    const daysBasis = memberDaysBasis(m)
     const today = new Date()
-    const isNew = isSameLocalDay(displayDate, today)
-    const days = daysSince(displayDate, today)
+    const isNew = isSameLocalDay(daysBasis, today)
+    const days = daysSince(daysBasis, today)
     return `
       <div class="photo-card" data-member-id="${escapeHtml(String(m.id))}">
         <img class="photo-square" src="${escapeHtml(m.photo_url)}" alt="${escapeHtml(m.name)}" />
         <div class="photo-name">${escapeHtml(m.name)}</div>
         ${m.district ? `<div class="photo-district">${escapeHtml(m.district)}</div>` : ''}
         ${dateLabel ? `<div class="photo-date">${dateLabel}</div>` : ''}
+        ${levelDateLabelText2 ? `<div class="photo-date photo-date-level">${levelDateLabelText2}</div>` : ''}
         ${isNew ? `<div class="photo-new-badge">New</div>` : (days !== null && days > 0 ? `<div class="photo-days-badge">${days} Day${days === 1 ? '' : 's'}</div>` : '')}
       </div>
     `
@@ -1211,10 +1260,17 @@
   const cropFrame = document.getElementById('cropFrame')
   const cropCanvas = document.getElementById('cropCanvas')
   const zoomRange = document.getElementById('zoomRange')
+  const dateStepHeading = document.getElementById('dateStepHeading')
+  const dateStepHint = document.getElementById('dateStepHint')
+  const joinedDateField = document.getElementById('joinedDateField')
+  const levelDateField = document.getElementById('levelDateField')
+  const levelDateLabel = document.getElementById('levelDateLabel')
+  const levelDateInput = document.getElementById('levelDateInput')
 
-  const TOTAL_STEPS = 7 // 0 photo (pick+crop), 1 name, 2 district, 3 phone, 4 identifier, 5 proof photo, 6 date joined
-  // Can't pick a future date for "date joined Vistory"
+  const TOTAL_STEPS = 7 // 0 photo (pick+crop), 1 name, 2 district, 3 phone, 4 identifier, 5 proof photo, 6 date(s)
+  // Can't pick a future date for "date joined Vistory" or the level date
   if (joinedDateInput) joinedDateInput.max = new Date().toISOString().slice(0, 10)
+  if (levelDateInput) levelDateInput.max = new Date().toISOString().slice(0, 10)
   let currentStep = 0
   let croppedPhotoBlob = null   // final cropped Hall of Fame photo, as a Blob
   let croppedPhotoUrl = null    // object URL for preview
@@ -1278,6 +1334,32 @@
     nftInput.placeholder = isTs ? 'e.g. aB12Cd3456' : 'e.g. 04821'
     nftInput.inputMode = isTs ? 'text' : 'numeric'
     nftInput.maxLength = isTs ? 10 : 5
+  }
+
+  // Text for the level-specific date field/heading, e.g.
+  // "Date you unlocked V-Boost Level 5" or "Date you reached T&S 5 Direct".
+  function levelDateLabelText(board, level) {
+    const shortName = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    return isDirectBoard(board)
+      ? `Date you reached ${shortName} ${level} Direct`
+      : `Date you unlocked ${shortName} Level ${level}`
+  }
+
+  // Configures step 7 (dates) right before it's shown: an upgrade only asks
+  // for the level date (joined date is kept from the existing member row),
+  // a fresh registration asks for both.
+  function updateDateStep() {
+    const label = levelDateLabelText(activeBoard, activeLevel)
+    levelDateLabel.textContent = label
+    if (isUpgrade) {
+      joinedDateField.style.display = 'none'
+      dateStepHeading.textContent = label
+      dateStepHint.textContent = 'This is the date that will be shown publicly on your Hall of Fame card.'
+    } else {
+      joinedDateField.style.display = 'block'
+      dateStepHeading.textContent = 'Dates'
+      dateStepHint.textContent = 'These dates will be shown publicly on your Hall of Fame card.'
+    }
   }
 
   function updatePhoneHint() {
@@ -1367,6 +1449,7 @@
     upgradeFromLevel = null
     upgradeNotice.classList.remove('open')
     nftInput.disabled = false
+    levelDateInput.value = ''
     formSuccess.style.display = 'none'
     requestForm.style.display = 'block'
     submitBtn.disabled = false
@@ -1689,6 +1772,7 @@
         showError('Please choose a valid proof photo before continuing.')
         return
       }
+      updateDateStep()
       showStep(6)
       return
     }
@@ -1717,21 +1801,40 @@
     const fullPhone = `${c.code}${phoneInput.value.trim()}`
     const nft = nftInput.value.trim()
     const proofPhoto = proofPhotoInput.files[0]
-    const joinedDate = joinedDateInput.value
+    const joinedDate = isUpgrade ? '' : joinedDateInput.value
+    const levelDate = levelDateInput.value
+    const today = new Date().toISOString().slice(0, 10)
 
     if (!name || !district || !croppedPhotoBlob || phoneInput.value.trim().length < c.min || !identifierIsValid(nft) || !proofPhoto || !proofPhoto.type.startsWith('image/') || proofPhoto.size > MAX_PROOF_PHOTO_BYTES) {
       showError('Please complete every step before submitting.')
       return
     }
 
-    if (!joinedDate) {
+    if (!isUpgrade) {
+      if (!joinedDate) {
+        showStep(6)
+        showError('Please enter the date you joined Vistory.')
+        return
+      }
+      if (joinedDate > today) {
+        showStep(6)
+        showError('The date you joined Vistory can\'t be in the future.')
+        return
+      }
+    }
+    if (!levelDate) {
       showStep(6)
-      showError('Please enter the date you joined Vistory.')
+      showError(`Please enter the ${levelDateLabelText(activeBoard, activeLevel).toLowerCase()}.`)
       return
     }
-    if (joinedDate > new Date().toISOString().slice(0, 10)) {
+    if (levelDate > today) {
       showStep(6)
-      showError('The date you joined Vistory can\'t be in the future.')
+      showError(`The ${levelDateLabelText(activeBoard, activeLevel).toLowerCase()} can't be in the future.`)
+      return
+    }
+    if (!isUpgrade && joinedDate && levelDate < joinedDate) {
+      showStep(6)
+      showError('That date can\'t be before the date you joined Vistory.')
       return
     }
 
@@ -1768,7 +1871,11 @@
         proof_photo_url: proofPhotoUrl,
         is_upgrade: isUpgrade,
         upgrade_from_level: isUpgrade ? upgradeFromLevel : null,
-        joined_at: joinedDate,
+        // On an upgrade the member already has a joined_at on their existing
+        // member row (carried over on accept) — this form only asks for it
+        // on a fresh registration.
+        joined_at: isUpgrade ? null : joinedDate,
+        level_at: levelDate,
       })
       if (insertError) {
         if (insertError.code === '23505' && !isUpgrade) {
@@ -1820,6 +1927,7 @@
   const idCardName = document.getElementById('idCardName')
   const idCardDistrict = document.getElementById('idCardDistrict')
   const idCardDate = document.getElementById('idCardDate')
+  const idCardLevelDate = document.getElementById('idCardLevelDate')
   const idCardDays = document.getElementById('idCardDays')
   const idCardLevel = document.getElementById('idCardLevel')
   const idCardCloseBtn = document.getElementById('idCardCloseBtn')
@@ -1856,11 +1964,14 @@
     idCardDistrict.textContent = member.district || ''
     idCardDistrict.style.display = member.district ? '' : 'none'
     idCardDate.textContent = joinedLabel(member)
+    const levelDateText = levelDateCaption(member)
+    idCardLevelDate.innerHTML = levelDateText
+    idCardLevelDate.style.display = levelDateText ? '' : 'none'
     idCardLevel.innerHTML = idCardLevelLabel(member.board, member.level)
     idCardStatus.textContent = ''
 
     if (withDays) {
-      const days = daysSince(memberDisplayDate(member), new Date())
+      const days = daysSince(memberDaysBasis(member), new Date())
       idCardDays.textContent = days !== null && days >= 0 ? `${days} Day${days === 1 ? '' : 's'}` : ''
       idCardDays.style.display = idCardDays.textContent ? '' : 'none'
     } else {
@@ -2036,6 +2147,8 @@
   const editReqIdentifierInput = document.getElementById('editReqIdentifierInput')
   const editReqIdentifierHint = document.getElementById('editReqIdentifierHint')
   const editReqJoinedAtInput = document.getElementById('editReqJoinedAtInput')
+  const editReqLevelAtLabel = document.getElementById('editReqLevelAtLabel')
+  const editReqLevelAtInput = document.getElementById('editReqLevelAtInput')
   const editReqError = document.getElementById('editReqError')
   const editReqCancelBtn = document.getElementById('editReqCancelBtn')
   const editReqSubmitBtn = document.getElementById('editReqSubmitBtn')
@@ -2093,6 +2206,10 @@
     // Prefilled with the current date — leave it as it is to keep the same one
     editReqJoinedAtInput.max = new Date().toISOString().slice(0, 10)
     editReqJoinedAtInput.value = member.joined_at || ''
+
+    editReqLevelAtLabel.textContent = levelDateLabelText(member.board, member.level)
+    editReqLevelAtInput.max = new Date().toISOString().slice(0, 10)
+    editReqLevelAtInput.value = member.level_at || ''
 
     editReqSubmitBtn.disabled = false
     editReqSubmitBtn.textContent = 'Submit request'
@@ -2292,6 +2409,7 @@
     const identifierTyped = editReqIdentifierInput.value.trim()
     const identifier = identifierTyped || editReqMember.passport_nft || ''
     const joinedAt = editReqJoinedAtInput.value
+    const levelAt = editReqLevelAtInput.value
 
     if (!name) { showEditReqError('Please enter the full name.'); return }
     if (!district) { showEditReqError('Please enter the district.'); return }
@@ -2309,6 +2427,11 @@
       showEditReqError("The date joined Vistory can't be in the future.")
       return
     }
+    if (!levelAt) { showEditReqError(`Please enter the ${editReqLevelAtLabel.textContent.toLowerCase()}.`); return }
+    if (levelAt > new Date().toISOString().slice(0, 10)) {
+      showEditReqError(`The ${editReqLevelAtLabel.textContent.toLowerCase()} can't be in the future.`)
+      return
+    }
 
     const nothingChanged =
       name === (editReqMember.name || '') &&
@@ -2316,6 +2439,7 @@
       phone === (editReqMember.phone || '') &&
       identifier === (editReqMember.passport_nft || '') &&
       joinedAt === (editReqMember.joined_at || '') &&
+      levelAt === (editReqMember.level_at || '') &&
       !editReqPhotoFile
     if (nothingChanged) { showEditReqError("You haven't changed anything yet."); return }
 
@@ -2343,6 +2467,8 @@
         new_photo_url: newPhotoUrl,
         old_joined_at: editReqMember.joined_at,
         new_joined_at: joinedAt,
+        old_level_at: editReqMember.level_at,
+        new_level_at: levelAt,
       })
       if (insertError) throw insertError
 
