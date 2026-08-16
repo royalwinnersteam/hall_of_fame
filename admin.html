@@ -102,7 +102,7 @@
   .request-field-value.request-level { color: var(--gold); }
   .request-field-value.request-type { color: var(--whale-blue-light); }
 
-  .request-actions { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+  .request-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; flex-shrink: 0; margin-left: auto; }
   .btn { border: none; border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-accept { background: var(--success); color: #0d1f16; }
@@ -132,12 +132,36 @@
     width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
     color: var(--text); font-size: 14px; font-family: var(--font-body);
   }
-  .edit-field input:focus, .edit-field select:focus { outline: 2px solid var(--gold-dim); outline-offset: 1px; }
+  .edit-field input[type="date"] {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    color: var(--text); font-size: 14px; font-family: var(--font-mono);
+    color-scheme: dark; /* native calendar popup follows the dark theme */
+  }
+  .edit-field input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(74%) sepia(46%) saturate(526%) hue-rotate(1deg) brightness(101%) contrast(93%); /* tints the icon gold */
+    cursor: pointer; border-radius: 4px; padding: 2px;
+  }
+  .edit-field input[type="date"]::-webkit-calendar-picker-indicator:hover { background: rgba(232, 182, 90, 0.12); }
+  .edit-field input:focus, .edit-field select:focus, .edit-field input[type="date"]:focus { outline: 2px solid var(--gold-dim); outline-offset: 1px; }
   .edit-photo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
   .edit-photo-preview { width: 84px; height: 84px; border-radius: 10px; object-fit: cover; background: var(--line); border: 1px solid var(--line); flex-shrink: 0; }
   .edit-photo-btn { position: relative; overflow: hidden; }
   .edit-photo-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .edit-photo-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* ---- Photo adjustment (crop/zoom) tool, shown after a new photo is picked ---- */
+  .crop-stage { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .crop-frame {
+    width: 220px; height: 220px; border-radius: 14px; overflow: hidden;
+    background: #000; border: 2px solid var(--gold-dim);
+    touch-action: none; cursor: grab; position: relative;
+  }
+  .crop-frame:active { cursor: grabbing; }
+  .crop-frame canvas { display: block; }
+  .crop-controls { width: 100%; display: flex; align-items: center; gap: 10px; }
+  .crop-controls label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .crop-controls input[type="range"] { flex: 1; accent-color: var(--gold); }
+  .crop-tip { font-size: 11px; color: var(--muted); text-align: center; margin: 0; }
   .edit-error { font-size: 13px; font-weight: 600; color: var(--danger); background: rgba(224,104,95,0.12); border: 1px solid rgba(224,104,95,0.4); border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; display: none; }
   .edit-actions { display: flex; gap: 10px; margin-top: 6px; }
   .edit-actions .btn { flex: 1; padding: 11px 16px; }
@@ -191,7 +215,7 @@
 
   @media (max-width: 640px) {
     .request-row { flex-direction: column; align-items: stretch; }
-    .request-actions { margin-left: 0; }
+    .request-actions { margin-left: 0; flex-wrap: wrap; }
     .request-actions .btn { flex: 1; }
   }
 </style>
@@ -257,12 +281,12 @@
 <!-- Edit member modal -->
 <div class="edit-overlay" id="editOverlay">
   <div class="edit-modal">
-    <h2 class="edit-modal-title">Edit member</h2>
+    <h2 class="edit-modal-title" id="editModalTitle">Edit member</h2>
     <p class="edit-modal-sub" id="editModalSub">Update their details below. Changes appear on the Hall of Fame site automatically.</p>
 
     <p class="edit-error" id="editError"></p>
 
-    <div class="edit-photo-row">
+    <div class="edit-photo-row" id="editPhotoRow">
       <img class="edit-photo-preview" id="editPhotoPreview" alt="" />
       <div>
         <button type="button" class="btn btn-secondary edit-photo-btn">
@@ -270,6 +294,22 @@
           <input type="file" accept="image/*" id="editPhotoInput" />
         </button>
         <div class="edit-photo-hint">Under 500 KB. Leave unchanged to keep the current photo.</div>
+      </div>
+    </div>
+
+    <!-- Crop/zoom adjustment tool, shown right after a new photo is picked -->
+    <div class="crop-stage" id="editCropView" style="display:none;">
+      <div class="crop-frame" id="editCropFrame">
+        <canvas id="editCropCanvas" width="220" height="220"></canvas>
+      </div>
+      <div class="crop-controls">
+        <label for="editZoomRange">Zoom</label>
+        <input type="range" id="editZoomRange" min="100" max="300" value="100" />
+      </div>
+      <p class="crop-tip">Drag to reposition, use the slider to zoom, then tap Use this photo.</p>
+      <div class="edit-actions" style="margin-top:0;">
+        <button type="button" class="btn btn-secondary" id="editCropCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="editCropOkBtn">Use this photo</button>
       </div>
     </div>
 
@@ -293,9 +333,14 @@
       <input type="text" id="editIdentifierInput" />
     </div>
 
-    <div class="edit-field">
+    <div class="edit-field" id="editLevelField">
       <label>Level</label>
       <select id="editLevelInput"></select>
+    </div>
+
+    <div class="edit-field">
+      <label>Joined Vistory</label>
+      <input type="date" id="editJoinedAtInput" />
     </div>
 
     <div class="edit-actions">
@@ -489,6 +534,20 @@
     return `${Math.floor(hours / 24)}d ago`
   }
 
+  // Formats the member-entered "date joined Vistory" (a plain
+  // YYYY-MM-DD date, no time component) as dd-mm-yyyy, parsed as a local
+  // calendar date so it never shifts a day depending on timezone.
+  function formatJoinedDate(dateStr) {
+    if (!dateStr) return '—'
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+    const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}-${mm}-${yyyy}`
+  }
+
   function escapeHtml(str) {
     const div = document.createElement('div')
     div.textContent = str
@@ -676,11 +735,16 @@
             <div class="request-field-value">${escapeHtml(req.passport_nft)}</div>
           </div>
           <div>
+            <div class="request-field-label">Joined Vistory</div>
+            <div class="request-field-value">${formatJoinedDate(req.joined_at)}</div>
+          </div>
+          <div>
             <div class="request-field-label">Submitted</div>
             <div class="request-field-value">${timeAgo(req.created_at)}</div>
           </div>
         </div>
         <div class="request-actions">
+          <button class="btn btn-edit" data-id="${req.id}" data-action="edit">Edit</button>
           <button class="btn btn-accept" data-id="${req.id}" data-action="accept">Accept</button>
           <button class="btn btn-reject" data-id="${req.id}" data-action="reject">Reject</button>
         </div>
@@ -688,7 +752,8 @@
       row.querySelectorAll('.request-photos img').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
-      row.querySelectorAll('.request-actions button').forEach((btn) => {
+      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(req, 'request'))
+      row.querySelectorAll('.request-actions button:not([data-action="edit"])').forEach((btn) => {
         btn.addEventListener('click', () => handleAction(btn.dataset.id, btn.dataset.action, btn))
       })
       listEl.appendChild(row)
@@ -746,11 +811,16 @@
             <div class="request-field-value">${escapeHtml(req.passport_nft)}</div>
           </div>
           <div>
+            <div class="request-field-label">Joined Vistory</div>
+            <div class="request-field-value">${formatJoinedDate(req.joined_at)}</div>
+          </div>
+          <div>
             <div class="request-field-label">Rejected</div>
             <div class="request-field-value">${timeAgo(req.created_at)}</div>
           </div>
         </div>
         <div class="request-actions">
+          <button class="btn btn-edit" data-id="${req.id}" data-action="edit">Edit</button>
           <button class="btn btn-accept" data-id="${req.id}" data-action="accept">Accept</button>
           <button class="btn btn-delete" data-id="${req.id}" data-action="delete">Delete permanently</button>
         </div>
@@ -758,7 +828,8 @@
       row.querySelectorAll('.request-photos img').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
-      row.querySelectorAll('.request-actions button').forEach((btn) => {
+      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(req, 'rejected'))
+      row.querySelectorAll('.request-actions button:not([data-action="edit"])').forEach((btn) => {
         if (btn.dataset.action === 'delete') {
           btn.addEventListener('click', () => openConfirm({
             title: 'Delete permanently?',
@@ -817,6 +888,10 @@
             <div class="request-field-value">${m.passport_nft ? escapeHtml(m.passport_nft) : '—'}</div>
           </div>
           <div>
+            <div class="request-field-label">Joined Vistory</div>
+            <div class="request-field-value">${formatJoinedDate(m.joined_at)}</div>
+          </div>
+          <div>
             <div class="request-field-label">Member since</div>
             <div class="request-field-value">${timeAgo(m.created_at)}</div>
           </div>
@@ -829,7 +904,7 @@
       row.querySelectorAll('.request-photos img').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
-      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(m))
+      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(m, 'member'))
       row.querySelector('[data-action="remove"]').addEventListener('click', (e) => {
         const btnEl = e.currentTarget
         openConfirm({
@@ -892,12 +967,14 @@
           ${editReqFieldHtml('District', r.old_district, r.new_district)}
           ${editReqFieldHtml('WhatsApp', r.old_phone, r.new_phone)}
           ${editReqFieldHtml(isTsBoard(r.board) ? 'Link ID' : 'Passport NFT', r.old_passport_nft, r.new_passport_nft)}
+          ${editReqFieldHtml('Joined Vistory', formatJoinedDate(r.old_joined_at), formatJoinedDate(r.new_joined_at))}
           <div>
             <div class="request-field-label">Requested</div>
             <div class="request-field-value">${timeAgo(r.created_at)}</div>
           </div>
         </div>
         <div class="request-actions">
+          <button class="btn btn-edit" data-id="${r.id}" data-action="edit">Edit</button>
           <button class="btn btn-accept-changes" data-id="${r.id}" data-action="accept">Accept changes</button>
           <button class="btn btn-reject-changes" data-id="${r.id}" data-action="reject">Remove changes</button>
         </div>
@@ -905,7 +982,8 @@
       row.querySelectorAll('.request-photos img').forEach((img) => {
         img.addEventListener('click', () => openLightbox(img.dataset.full))
       })
-      row.querySelectorAll('.request-actions button').forEach((btn) => {
+      row.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(r, 'editRequest'))
+      row.querySelectorAll('.request-actions button:not([data-action="edit"])').forEach((btn) => {
         btn.addEventListener('click', () => handleEditRequestAction(btn.dataset.id, btn.dataset.action, btn))
       })
       listEl.appendChild(row)
@@ -947,6 +1025,7 @@
         district: req.new_district,
         phone: req.new_phone,
         passport_nft: req.new_passport_nft,
+        joined_at: req.new_joined_at,
       }
       if (req.new_photo_url) updates.photo_url = req.new_photo_url
 
@@ -1101,9 +1180,14 @@
         phone: req.phone,
         passport_nft: req.passport_nft,
         photo_url: req.photo_url,
-        // Preserve the date the member originally submitted their request (shown
-        // publicly on the Hall of Fame page) — not the moment an admin got to it.
+        // Preserve the date the member originally submitted their request —
+        // kept as a fallback for older rows that predate joined_at.
         submitted_at: req.created_at,
+        // The date the member says they joined Vistory (entered by them
+        // on the request form) — this is what's shown publicly on the Hall of
+        // Fame page as "Joined Vistory on ...", not the moment an admin
+        // got around to accepting the request.
+        joined_at: req.joined_at,
       })
       if (insertError) {
         console.error(insertError)
@@ -1200,23 +1284,88 @@
 
   // ---- Edit member modal ----
   const editOverlay = document.getElementById('editOverlay')
+  const editModalTitle = document.getElementById('editModalTitle')
   const editModalSub = document.getElementById('editModalSub')
   const editError = document.getElementById('editError')
+  const editPhotoRow = document.getElementById('editPhotoRow')
   const editPhotoPreview = document.getElementById('editPhotoPreview')
   const editPhotoInput = document.getElementById('editPhotoInput')
+  const editCropView = document.getElementById('editCropView')
+  const editCropFrame = document.getElementById('editCropFrame')
+  const editCropCanvas = document.getElementById('editCropCanvas')
+  const editZoomRange = document.getElementById('editZoomRange')
+  const editCropCancelBtn = document.getElementById('editCropCancelBtn')
+  const editCropOkBtn = document.getElementById('editCropOkBtn')
   const editNameInput = document.getElementById('editNameInput')
   const editDistrictInput = document.getElementById('editDistrictInput')
   const editPhoneInput = document.getElementById('editPhoneInput')
   const editIdentifierLabel = document.getElementById('editIdentifierLabel')
   const editIdentifierInput = document.getElementById('editIdentifierInput')
+  const editLevelField = document.getElementById('editLevelField')
   const editLevelInput = document.getElementById('editLevelInput')
+  const editJoinedAtInput = document.getElementById('editJoinedAtInput')
   const editCancelBtn = document.getElementById('editCancelBtn')
   const editSaveBtn = document.getElementById('editSaveBtn')
 
   const MAX_EDIT_PHOTO_BYTES = 500 * 1024 // 500 KB, matches the public site's limit
 
-  let editingMember = null
+  let editingRecord = null // the raw row object (member / request / rejected request / edit request)
+  let editingKind = null   // 'member' | 'request' | 'rejected' | 'editRequest'
   let editNewPhotoFile = null // set only if the admin picks a replacement photo
+
+  // Normalizes the differences between the 4 tables an "Edit" button can be
+  // opened from, so the rest of the modal code doesn't need to know which one
+  // it's dealing with.
+  //  - member / request / rejected: same shape (name, district, phone,
+  //    passport_nft, level, joined_at, photo_url) on the members / requests
+  //    tables respectively.
+  //  - editRequest: the edit_requests row itself is never "live" — editing it
+  //    here means adjusting the *proposed* new_* values before an admin
+  //    accepts or rejects them. There's no level on this table (edit requests
+  //    never propose a level change), and the photo shown/replaced is
+  //    whichever the member would end up with (new_photo_url if a photo
+  //    change was proposed, else their current old_photo_url).
+  function editKindConfig(kind) {
+    if (kind === 'member') {
+      return {
+        table: 'members', title: 'Edit member', showLevel: true, photoField: 'photo_url',
+        arrayRef: () => allMembers,
+        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, photo_url: r.photo_url }),
+        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at }),
+        getCleanupPhoto: (r) => r.photo_url,
+        getSelfMemberId: (r) => r.id,
+      }
+    }
+    if (kind === 'request' || kind === 'rejected') {
+      return {
+        table: 'requests', title: kind === 'rejected' ? 'Edit rejected request' : 'Edit request', showLevel: true, photoField: 'photo_url',
+        arrayRef: () => allRequests,
+        getFields: (r) => ({ name: r.name, district: r.district, phone: r.phone, passport_nft: r.passport_nft, level: r.level, joined_at: r.joined_at, photo_url: r.photo_url }),
+        buildUpdates: (f) => ({ name: f.name, district: f.district, phone: f.phone, passport_nft: f.passport_nft, level: f.level, joined_at: f.joined_at }),
+        getCleanupPhoto: (r) => r.photo_url,
+        getSelfMemberId: () => null,
+      }
+    }
+    // editRequest
+    return {
+      table: 'edit_requests', title: 'Edit proposed changes', showLevel: false, photoField: 'new_photo_url',
+      arrayRef: () => allEditRequests,
+      getFields: (r) => ({
+        name: r.new_name || r.old_name,
+        district: r.new_district != null ? r.new_district : r.old_district,
+        phone: r.new_phone || r.old_phone,
+        passport_nft: r.new_passport_nft || r.old_passport_nft,
+        level: null,
+        joined_at: r.new_joined_at != null ? r.new_joined_at : r.old_joined_at,
+        photo_url: r.new_photo_url || r.old_photo_url,
+      }),
+      buildUpdates: (f) => ({ new_name: f.name, new_district: f.district, new_phone: f.phone, new_passport_nft: f.passport_nft, new_joined_at: f.joined_at }),
+      // Only clean up a *previously proposed* photo — never the member's
+      // current old_photo_url, since that's still live on their member row.
+      getCleanupPhoto: (r) => r.new_photo_url || null,
+      getSelfMemberId: (r) => r.member_id,
+    }
+  }
 
   function identifierIsValidFor(board, value) {
     if (isTsBoard(board)) return /^[A-Za-z0-9]{10}$/.test(value)
@@ -1228,30 +1377,46 @@
     editError.style.display = 'block'
   }
 
-  function openEditModal(member) {
-    editingMember = member
+  function openEditModal(record, kind) {
+    const config = editKindConfig(kind)
+    editingRecord = record
+    editingKind = kind
     editNewPhotoFile = null
     editError.style.display = 'none'
-    editModalSub.textContent = `${BOARD_LABELS[member.board] || member.board} · currently Level ${member.level}`
+    editModalTitle.textContent = config.title
 
-    editPhotoPreview.src = member.photo_url
+    const f = config.getFields(record)
+    editModalSub.textContent = config.showLevel
+      ? `${BOARD_LABELS[record.board] || record.board} · currently Level ${f.level}`
+      : `${BOARD_LABELS[record.board] || record.board} · proposed changes`
+
+    editPhotoPreview.src = f.photo_url
     editPhotoInput.value = ''
-    editNameInput.value = member.name || ''
-    editDistrictInput.value = member.district || ''
-    editPhoneInput.value = member.phone || ''
+    editCropView.style.display = 'none'
+    editPhotoRow.style.display = 'flex'
+    editNameInput.value = f.name || ''
+    editDistrictInput.value = f.district || ''
+    editPhoneInput.value = f.phone || ''
 
-    editIdentifierLabel.textContent = isTsBoard(member.board) ? 'Link ID' : 'Passport NFT'
-    editIdentifierInput.value = member.passport_nft || ''
-    editIdentifierInput.maxLength = isTsBoard(member.board) ? 10 : 5
+    editIdentifierLabel.textContent = isTsBoard(record.board) ? 'Link ID' : 'Passport NFT'
+    editIdentifierInput.value = f.passport_nft || ''
+    editIdentifierInput.maxLength = isTsBoard(record.board) ? 10 : 5
 
-    editLevelInput.innerHTML = ''
-    levelsFor(member.board).forEach((lvl) => {
-      const opt = document.createElement('option')
-      opt.value = String(lvl)
-      opt.textContent = isDirectBoard(member.board) ? `${lvl} Direct` : `Level ${lvl}`
-      if (lvl === member.level) opt.selected = true
-      editLevelInput.appendChild(opt)
-    })
+    editLevelField.style.display = config.showLevel ? '' : 'none'
+    if (config.showLevel) {
+      editLevelInput.innerHTML = ''
+      levelsFor(record.board).forEach((lvl) => {
+        const opt = document.createElement('option')
+        opt.value = String(lvl)
+        opt.textContent = isDirectBoard(record.board) ? `${lvl} Direct` : `Level ${lvl}`
+        if (lvl === f.level) opt.selected = true
+        editLevelInput.appendChild(opt)
+      })
+    }
+
+    // Shown publicly on the Hall of Fame page as "Joined Vistory on ..."
+    editJoinedAtInput.max = new Date().toISOString().slice(0, 10)
+    editJoinedAtInput.value = f.joined_at || ''
 
     editSaveBtn.disabled = false
     editSaveBtn.textContent = 'Save changes'
@@ -1260,12 +1425,111 @@
 
   function closeEditModal() {
     editOverlay.classList.remove('open')
-    editingMember = null
+    editingRecord = null
+    editingKind = null
     editNewPhotoFile = null
+    editCropRawImage = null
+    editCropView.style.display = 'none'
+    editPhotoRow.style.display = 'flex'
   }
 
   editCancelBtn.addEventListener('click', closeEditModal)
   editOverlay.addEventListener('click', (e) => { if (e.target === editOverlay) closeEditModal() })
+
+  // ---- Photo adjustment (crop/zoom) tool for the edit-member photo ----
+  const EDIT_CROP_SIZE = 220
+  const editCropCtx = editCropCanvas.getContext('2d')
+  let editCropRawImage = null
+  let editCropState = { baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0 }
+  let editCropDragging = false
+  let editCropDragStart = { x: 0, y: 0, offX: 0, offY: 0 }
+
+  function editStartCropStage() {
+    if (!editCropRawImage) return
+    editCropState.baseScale = Math.max(
+      EDIT_CROP_SIZE / editCropRawImage.width,
+      EDIT_CROP_SIZE / editCropRawImage.height
+    )
+    editCropState.zoom = 1
+    editCropState.offsetX = 0
+    editCropState.offsetY = 0
+    editZoomRange.value = 100
+    editDrawCrop()
+  }
+
+  function editDrawCrop() {
+    if (!editCropRawImage) return
+    const scale = editCropState.baseScale * editCropState.zoom
+    editCropCtx.clearRect(0, 0, EDIT_CROP_SIZE, EDIT_CROP_SIZE)
+    editCropCtx.save()
+    editCropCtx.translate(EDIT_CROP_SIZE / 2 + editCropState.offsetX, EDIT_CROP_SIZE / 2 + editCropState.offsetY)
+    editCropCtx.scale(scale, scale)
+    editCropCtx.drawImage(editCropRawImage, -editCropRawImage.width / 2, -editCropRawImage.height / 2)
+    editCropCtx.restore()
+  }
+
+  function editClampOffsets() {
+    const scale = editCropState.baseScale * editCropState.zoom
+    const halfW = (editCropRawImage.width * scale) / 2
+    const halfH = (editCropRawImage.height * scale) / 2
+    const maxX = Math.max(0, halfW - EDIT_CROP_SIZE / 2)
+    const maxY = Math.max(0, halfH - EDIT_CROP_SIZE / 2)
+    editCropState.offsetX = Math.min(maxX, Math.max(-maxX, editCropState.offsetX))
+    editCropState.offsetY = Math.min(maxY, Math.max(-maxY, editCropState.offsetY))
+  }
+
+  function editPointerPos(e) {
+    if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    return { x: e.clientX, y: e.clientY }
+  }
+  function editOnDragStart(e) {
+    editCropDragging = true
+    const p = editPointerPos(e)
+    editCropDragStart = { x: p.x, y: p.y, offX: editCropState.offsetX, offY: editCropState.offsetY }
+  }
+  function editOnDragMove(e) {
+    if (!editCropDragging) return
+    const p = editPointerPos(e)
+    editCropState.offsetX = editCropDragStart.offX + (p.x - editCropDragStart.x)
+    editCropState.offsetY = editCropDragStart.offY + (p.y - editCropDragStart.y)
+    editClampOffsets()
+    editDrawCrop()
+  }
+  function editOnDragEnd() { editCropDragging = false }
+
+  editCropFrame.addEventListener('pointerdown', editOnDragStart)
+  window.addEventListener('pointermove', editOnDragMove)
+  window.addEventListener('pointerup', editOnDragEnd)
+  editCropFrame.addEventListener('touchstart', editOnDragStart, { passive: true })
+  editCropFrame.addEventListener('touchmove', (e) => { editOnDragMove(e); e.preventDefault() }, { passive: false })
+  editCropFrame.addEventListener('touchend', editOnDragEnd)
+
+  editZoomRange.addEventListener('input', () => {
+    editCropState.zoom = Number(editZoomRange.value) / 100
+    editClampOffsets()
+    editDrawCrop()
+  })
+
+  function editConfirmCrop() {
+    return new Promise((resolve, reject) => {
+      const OUTPUT_SIZE = 480
+      const out = document.createElement('canvas')
+      out.width = OUTPUT_SIZE
+      out.height = OUTPUT_SIZE
+      const octx = out.getContext('2d')
+      const factor = OUTPUT_SIZE / EDIT_CROP_SIZE
+      const scale = editCropState.baseScale * editCropState.zoom * factor
+      octx.save()
+      octx.translate(OUTPUT_SIZE / 2 + editCropState.offsetX * factor, OUTPUT_SIZE / 2 + editCropState.offsetY * factor)
+      octx.scale(scale, scale)
+      octx.drawImage(editCropRawImage, -editCropRawImage.width / 2, -editCropRawImage.height / 2)
+      octx.restore()
+      out.toBlob((blob) => {
+        if (!blob) return reject(new Error('Could not process the photo.'))
+        resolve(blob)
+      }, 'image/jpeg', 0.92)
+    })
+  }
 
   editPhotoInput.addEventListener('change', () => {
     const file = editPhotoInput.files[0]
@@ -1281,13 +1545,39 @@
       return
     }
     editError.style.display = 'none'
-    editNewPhotoFile = file
-    editPhotoPreview.src = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      editCropRawImage = img
+      editPhotoRow.style.display = 'none'
+      editCropView.style.display = 'flex'
+      editStartCropStage()
+    }
+    img.onerror = () => showEditError('Could not read that image — please try another photo.')
+    img.src = URL.createObjectURL(file)
   })
 
-  async function uploadEditPhoto(file, board, level) {
+  editCropCancelBtn.addEventListener('click', () => {
+    editCropRawImage = null
+    editPhotoInput.value = ''
+    editCropView.style.display = 'none'
+    editPhotoRow.style.display = 'flex'
+  })
+
+  editCropOkBtn.addEventListener('click', async () => {
+    try {
+      const blob = await editConfirmCrop()
+      editNewPhotoFile = new File([blob], 'member-photo.jpg', { type: 'image/jpeg' })
+      editPhotoPreview.src = URL.createObjectURL(editNewPhotoFile)
+      editCropView.style.display = 'none'
+      editPhotoRow.style.display = 'flex'
+    } catch (err) {
+      showEditError(err.message || 'Could not process the photo.')
+    }
+  })
+
+  async function uploadEditPhoto(file, board, pathSegment) {
     const ext = (file.name && file.name.split('.').pop()) || 'jpg'
-    const path = `${board}/${level}/${crypto.randomUUID()}.${ext}`
+    const path = `${board}/${pathSegment}/${crypto.randomUUID()}.${ext}`
     const { error: uploadError } = await supabase.storage
       .from(PHOTO_BUCKET)
       .upload(path, file, { cacheControl: '3600', upsert: false })
@@ -1297,15 +1587,17 @@
   }
 
   editSaveBtn.addEventListener('click', async () => {
-    if (!editingMember) return
+    if (!editingRecord) return
+    const config = editKindConfig(editingKind)
     editError.style.display = 'none'
 
     const name = editNameInput.value.trim()
     const district = editDistrictInput.value.trim()
     const phone = editPhoneInput.value.trim()
     const identifier = editIdentifierInput.value.trim()
-    const level = Number(editLevelInput.value)
-    const board = editingMember.board
+    const board = editingRecord.board
+    const level = config.showLevel ? Number(editLevelInput.value) : null
+    const joinedAt = editJoinedAtInput.value || null
 
     if (!name) { showEditError('Please enter the full name.'); return }
     if (!district) { showEditError('Please enter the district.'); return }
@@ -1314,15 +1606,25 @@
       showEditError(isTsBoard(board) ? 'Link ID must be exactly 10 characters.' : 'Passport NFT must be exactly 5 digits.')
       return
     }
+    if (joinedAt && joinedAt > new Date().toISOString().slice(0, 10)) {
+      showEditError("Joined Vistory date can't be in the future.")
+      return
+    }
 
     editSaveBtn.disabled = true
     editSaveBtn.textContent = 'Saving…'
 
     try {
+      const currentFields = config.getFields(editingRecord)
+      const selfMemberId = config.getSelfMemberId(editingRecord)
+
       // If the identifier changed, make sure it doesn't collide with a different
       // member already using it on this board (the DB's unique (board, passport_nft)
       // constraint would catch this too, but checking first gives a clearer message).
-      if (identifier !== editingMember.passport_nft) {
+      // selfMemberId lets an admin "revert" back to a member's own existing
+      // identifier (e.g. editing an edit request back to what the member already
+      // has) without that being flagged as a collision with themselves.
+      if (identifier !== currentFields.passport_nft) {
         const { data: dupeRows, error: dupeErr } = await supabase
           .from('members')
           .select('id, level')
@@ -1330,7 +1632,7 @@
           .eq('passport_nft', identifier)
           .limit(1)
         if (dupeErr) throw dupeErr
-        if (dupeRows && dupeRows.length && dupeRows[0].id !== editingMember.id) {
+        if (dupeRows && dupeRows.length && dupeRows[0].id !== selfMemberId) {
           showEditError(`${isTsBoard(board) ? 'Link ID' : 'Passport NFT'} ${identifier} is already used by another member in ${BOARD_LABELS[board]} Level ${dupeRows[0].level}.`)
           editSaveBtn.disabled = false
           editSaveBtn.textContent = 'Save changes'
@@ -1338,16 +1640,17 @@
         }
       }
 
-      const updates = { name, district, phone, passport_nft: identifier, level }
+      const updates = config.buildUpdates({ name, district, phone, passport_nft: identifier, level, joined_at: joinedAt })
+      const photoToCleanup = config.getCleanupPhoto(editingRecord)
 
       if (editNewPhotoFile) {
-        updates.photo_url = await uploadEditPhoto(editNewPhotoFile, board, level)
+        updates[config.photoField] = await uploadEditPhoto(editNewPhotoFile, board, config.showLevel ? level : 'edit-requests')
       }
 
       const { error: updateError } = await supabase
-        .from('members')
+        .from(config.table)
         .update(updates)
-        .eq('id', editingMember.id)
+        .eq('id', editingRecord.id)
 
       if (updateError) {
         if (updateError.code === '23505') {
@@ -1361,13 +1664,15 @@
       }
 
       // New photo saved successfully — clean up the old file from storage now
-      // that nothing references it anymore.
-      if (editNewPhotoFile && editingMember.photo_url) {
-        deleteFromStorage(editingMember.photo_url)
+      // that nothing references it anymore. (For edit requests this only ever
+      // targets a previously *proposed* photo, never the member's live one.)
+      if (editNewPhotoFile && photoToCleanup) {
+        deleteFromStorage(photoToCleanup)
       }
 
-      const idx = allMembers.findIndex((m) => m.id === editingMember.id)
-      if (idx !== -1) allMembers[idx] = { ...allMembers[idx], ...updates }
+      const arr = config.arrayRef()
+      const idx = arr.findIndex((x) => x.id === editingRecord.id)
+      if (idx !== -1) arr[idx] = { ...arr[idx], ...updates }
 
       showToast(`Saved changes for ${name}`)
       closeEditModal()
