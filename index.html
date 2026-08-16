@@ -162,18 +162,18 @@
     pointer-events: none;
   }
   .photo-name {
-    font-size: 14px; font-weight: 700; color: var(--gold); text-align: center;
-    max-width: calc(var(--card-size) + 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 16px; font-weight: 700; color: var(--gold); text-align: center;
+    max-width: calc(var(--card-size) + 40px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .photo-district {
-    font-size: 11px; font-weight: 500; color: #c7cad6; text-align: center;
-    max-width: calc(var(--card-size) + 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    margin-top: -2px;
+    font-size: 13px; font-weight: 600; color: #ffffff; text-align: center;
+    max-width: calc(var(--card-size) + 40px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: -1px;
   }
   .photo-date {
-    font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--whale-blue); text-align: center;
-    max-width: calc(var(--card-size) + 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    margin-top: 1px; letter-spacing: 0.02em;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--whale-blue); text-align: center;
+    max-width: calc(var(--card-size) + 46px); white-space: normal; overflow: visible; line-height: 1.3;
+    margin-top: 2px; letter-spacing: 0.01em;
   }
   .photo-new-badge {
     display: inline-flex; align-items: center; justify-content: center;
@@ -226,6 +226,17 @@
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .field input[type="text"], .field input[type="tel"] { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; font-family: var(--font-body); }
+  .field input[type="date"] {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; color: var(--text); font-size: 14px; font-family: var(--font-mono);
+    color-scheme: dark; /* makes the native calendar popup itself follow the dark theme */
+  }
+  .field input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(74%) sepia(46%) saturate(526%) hue-rotate(1deg) brightness(101%) contrast(93%); /* tints the icon gold to match --gold */
+    cursor: pointer; border-radius: 4px; padding: 2px;
+  }
+  .field input[type="date"]::-webkit-calendar-picker-indicator:hover { background: rgba(232, 182, 90, 0.12); }
+  .field input[type="date"]:focus, .field input[type="date"]:hover { border-color: var(--gold-dim); }
   .field input:focus { outline: 2px solid var(--gold-dim); outline-offset: 1px; }
   .file-drop { border: 1px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center; cursor: pointer; background: var(--bg); position: relative; overflow: hidden; }
   .file-drop img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; display: none; }
@@ -332,8 +343,8 @@
   .idcard-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
   .idcard-details { text-align: center; margin-bottom: 16px; }
   .idcard-name { font-family: var(--font-display); font-size: 19px; color: var(--gold); margin-bottom: 4px; }
-  .idcard-district { font-size: 13px; font-weight: 600; color: var(--whale-blue-light); margin-bottom: 4px; }
-  .idcard-date { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .idcard-district { font-size: 13px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+  .idcard-date { font-family: var(--font-mono); font-size: 12px; color: var(--whale-blue); margin-bottom: 10px; }
   .idcard-level { display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.15; margin-bottom: 12px; }
   .idcard-level-board { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .idcard-level-value { font-family: var(--font-display); font-size: 20px; color: var(--gold); }
@@ -353,6 +364,26 @@
   @media (max-width: 380px) {
     .idcard-actions { grid-template-columns: repeat(2, 1fr); }
   }
+
+  .idcard-days { font-family: var(--font-mono); font-weight: 700; font-size: 18px; color: #9b111e; text-shadow: 0 0 10px rgba(155,17,30,0.45); margin-top: -4px; margin-bottom: 10px; }
+
+  /* ---- ID choice modal (asks with/without No. of Days before opening the ID card) ---- */
+  .idchoice-modal { max-width: 340px; text-align: center; }
+  .idchoice-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+  .idchoice-btn {
+    width: 100%; padding: 16px 14px; font-size: 14.5px; font-weight: 700;
+    border-radius: 12px; letter-spacing: 0.02em; display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: linear-gradient(180deg, #1c2130 0%, #12151f 100%);
+    border: 1px solid var(--line); color: var(--text);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  }
+  .idchoice-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .idchoice-btn:hover {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, #232a3d 0%, #171c29 100%);
+    box-shadow: 0 8px 22px rgba(232,182,90,0.25);
+  }
+  .idchoice-btn:active { transform: scale(0.98); }
 
   /* ---- Edit request modal ---- */
   .editreq-current {
@@ -431,7 +462,7 @@
 
       <!-- Step 0: Hall of Fame photo — pick, then position it in one step -->
       <div class="wizard-step" data-step="0">
-        <div class="step-label">Step 1 of 6</div>
+        <div class="step-label">Step 1 of 7</div>
         <h3 class="step-heading">Hall of Fame photo</h3>
 
         <div id="photoPickView">
@@ -460,7 +491,7 @@
 
       <!-- Step 1: full name -->
       <div class="wizard-step" data-step="1">
-        <div class="step-label">Step 2 of 6</div>
+        <div class="step-label">Step 2 of 7</div>
         <h3 class="step-heading">Full name</h3>
         <img class="step-photo-preview" id="namePhotoPreview" />
         <div class="field">
@@ -471,7 +502,7 @@
 
       <!-- Step 2: District -->
       <div class="wizard-step" data-step="2">
-        <div class="step-label">Step 3 of 6</div>
+        <div class="step-label">Step 3 of 7</div>
         <h3 class="step-heading">District</h3>
         <div class="field">
           <label>District</label>
@@ -481,7 +512,7 @@
 
       <!-- Step 3: WhatsApp number -->
       <div class="wizard-step" data-step="3">
-        <div class="step-label">Step 4 of 6</div>
+        <div class="step-label">Step 4 of 7</div>
         <h3 class="step-heading">WhatsApp number</h3>
         <p class="step-hint">Pick the country code — the number length is checked automatically.</p>
         <div class="field">
@@ -496,7 +527,7 @@
 
       <!-- Step 4: board-specific identifier -->
       <div class="wizard-step" data-step="4">
-        <div class="step-label">Step 5 of 6</div>
+        <div class="step-label">Step 5 of 7</div>
         <h3 class="step-heading" id="identifierHeading">Passport NFT</h3>
         <p class="step-hint" id="identifierHint">Enter the 5-digit Passport NFT number.</p>
         <div class="field">
@@ -514,7 +545,7 @@
 
       <!-- Step 5: photo proof -->
       <div class="wizard-step" data-step="5">
-        <div class="step-label">Step 6 of 6</div>
+        <div class="step-label">Step 6 of 7</div>
         <h3 class="step-heading">Proof photo</h3>
         <p class="step-hint" id="proofPhotoHint">Upload a clear photo that verifies your Passport NFT.</p>
         <div class="field">
@@ -523,6 +554,19 @@
             <div class="file-drop-label" id="proofPhotoLabel">Tap to choose a photo</div>
             <input type="file" accept="image/*" id="proofPhotoInput" />
           </div>
+        </div>
+      </div>
+
+      <!-- Step 6: date joined Vistory — this is the date shown on the public
+           Hall of Fame card ("Joined Vistory on ..."), set by the member
+           rather than defaulting to whenever the admin happens to accept the request -->
+      <div class="wizard-step" data-step="6">
+        <div class="step-label">Step 7 of 7</div>
+        <h3 class="step-heading">Date you joined Vistory</h3>
+        <p class="step-hint">This is the date that will be shown publicly on your Hall of Fame card.</p>
+        <div class="field">
+          <label>Date joined Vistory</label>
+          <input type="date" id="joinedDateInput" />
         </div>
       </div>
 
@@ -562,6 +606,7 @@
         <div class="idcard-name" id="idCardName"></div>
         <div class="idcard-district" id="idCardDistrict"></div>
         <div class="idcard-date" id="idCardDate"></div>
+        <div class="idcard-days" id="idCardDays" style="display:none;"></div>
       </div>
       <div class="idcard-footer">Royal Spark Winners Team</div>
     </div>
@@ -585,6 +630,27 @@
       </button>
     </div>
     <div class="idcard-action-status" id="idCardStatus"></div>
+  </div>
+</div>
+
+<!-- ID choice modal: shown when a photo in the roster is tapped, before the ID
+     card itself opens, so the member/visitor can pick whether the card should
+     include the "No. of Days" line under the date. -->
+<div class="modal-overlay" id="idChoiceOverlay">
+  <div class="modal idchoice-modal">
+    <h2 class="modal-title">Show ID Frame</h2>
+    <p class="modal-sub">Choose how you'd like to view it.</p>
+    <div class="idchoice-actions">
+      <button type="button" class="idchoice-btn" id="idChoiceWithoutBtn">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="#e8b65a" stroke-width="1.6"/><path d="M3 10h18M8 3v4M16 3v4" stroke="#e8b65a" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Without No. of Days
+      </button>
+      <button type="button" class="idchoice-btn" id="idChoiceWithBtn">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="#e8b65a" stroke-width="1.6"/><path d="M3 10h18M8 3v4M16 3v4" stroke="#e8b65a" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="13" r="8" stroke="#e8b65a" stroke-width="1.6"/><path d="M12 9v4l3 2" stroke="#e8b65a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 2h6" stroke="#e8b65a" stroke-width="1.6" stroke-linecap="round"/></svg>
+        With No. of Days
+      </button>
+    </div>
   </div>
 </div>
 
@@ -612,6 +678,23 @@
           <div class="file-drop-label" id="editReqPhotoLabel">Tap to choose a new photo — leave empty to keep the current one</div>
           <input type="file" accept="image/*" id="editReqPhotoInput" />
         </div>
+        <button type="button" class="redo-link" id="editReqRedoPhotoBtn" style="display:none;">Choose a different photo</button>
+
+        <!-- Crop/zoom adjustment tool, shown right after a new photo is picked -->
+        <div class="crop-stage" id="editReqCropView" style="display:none; margin-top: 10px;">
+          <div class="crop-frame" id="editReqCropFrame">
+            <canvas id="editReqCropCanvas" width="260" height="260"></canvas>
+          </div>
+          <div class="crop-controls">
+            <label for="editReqZoomRange">Zoom</label>
+            <input type="range" id="editReqZoomRange" min="100" max="300" value="100" />
+          </div>
+          <p class="crop-tip">Drag to reposition, use the slider to zoom, then tap Use this photo.</p>
+          <div class="modal-actions" style="margin-top:0;">
+            <button type="button" class="btn btn-secondary" id="editReqCropCancelBtn">Cancel</button>
+            <button type="button" class="btn btn-primary" id="editReqCropOkBtn">Use this photo</button>
+          </div>
+        </div>
       </div>
 
       <div class="field">
@@ -625,7 +708,7 @@
       </div>
 
       <div class="field">
-        <label>WhatsApp number</label>
+        <label id="editReqPhoneLabel">WhatsApp number</label>
         <input type="tel" id="editReqPhoneInput" placeholder="Enter a new number, or leave empty to keep the current one" />
         <div class="field-hint">Leave this empty if the WhatsApp number doesn't need to change.</div>
       </div>
@@ -634,6 +717,12 @@
         <label id="editReqIdentifierLabel">Passport NFT</label>
         <input type="text" id="editReqIdentifierInput" />
         <div class="field-hint" id="editReqIdentifierHint">Leave this empty if it doesn't need to change.</div>
+      </div>
+
+      <div class="field">
+        <label>Date joined Vistory</label>
+        <input type="date" id="editReqJoinedAtInput" />
+        <div class="field-hint">Leave it as it is to keep the same date.</div>
       </div>
 
       <p class="form-error" id="editReqError"></p>
@@ -706,7 +795,7 @@
 
   let lastMembersSignature = null
   function membersSignature(rows) {
-    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}:${r.submitted_at}`).sort().join('|')
+    return rows.map((r) => `${r.id}:${r.board}:${r.level}:${r.name}:${r.district}:${r.photo_url}:${r.submitted_at}:${r.joined_at}`).sort().join('|')
   }
 
   async function loadMembers() {
@@ -788,12 +877,12 @@
       btn.addEventListener('click', () => openModal(currentBoard, btn.dataset.level))
     })
 
-    // wire up photo cards: tap a photo to open its ID card
+    // wire up photo cards: tap a photo to ask with/without No. of Days, then open its ID card
     levelListEl.querySelectorAll('.photo-card').forEach((card) => {
       card.addEventListener('click', () => {
         const id = card.dataset.memberId
         const member = allMembers.find((mm) => String(mm.id) === id)
-        if (member) openIdCard(member)
+        if (member) openIdChoice(member)
       })
     })
 
@@ -804,22 +893,35 @@
     })
   }
 
-  // The date shown to visitors is the date the member originally *submitted*
-  // their request (submitted_at), not the date an admin happened to accept it
-  // (created_at on the members row). Older rows inserted before this field
-  // existed fall back to created_at so nothing breaks.
+  // The date shown to visitors is the date the member says they *joined the
+  // Vistory* (joined_at), entered by them on step 7 of the request form and
+  // carried over by the admin on accept. Rows submitted before this field
+  // existed fall back to submitted_at (original request date), then to
+  // created_at, so nothing breaks for older members.
   function memberDisplayDate(m) {
-    return m.submitted_at || m.created_at
+    return m.joined_at || m.submitted_at || m.created_at
   }
 
   function formatDisplayDate(dateStr) {
     if (!dateStr) return ''
-    const d = new Date(dateStr)
+    // Plain "YYYY-MM-DD" date values (no time component, e.g. joined_at) are
+    // parsed as UTC midnight by `new Date()` — parse them as local calendar
+    // dates instead so the date shown never shifts a day depending on timezone.
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+    const d = dateOnlyMatch
+      ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+      : new Date(dateStr)
     if (isNaN(d.getTime())) return ''
     const dd = String(d.getDate()).padStart(2, '0')
     const mm = String(d.getMonth() + 1).padStart(2, '0')
     const yyyy = d.getFullYear()
     return `${dd}-${mm}-${yyyy}`
+  }
+
+  // Full sentence shown under each photo / on the ID card in front of the date
+  function joinedLabel(m) {
+    const dateLabel = formatDisplayDate(memberDisplayDate(m))
+    return dateLabel ? `Joined Vistory on ${dateLabel}` : ''
   }
 
   function isSameLocalDay(dateStr, ref) {
@@ -845,7 +947,7 @@
 
   function renderPhotoCard(m) {
     const displayDate = memberDisplayDate(m)
-    const dateLabel = formatDisplayDate(displayDate)
+    const dateLabel = joinedLabel(m)
     const today = new Date()
     const isNew = isSameLocalDay(displayDate, today)
     const days = daysSince(displayDate, today)
@@ -1091,6 +1193,7 @@
   const upgradeConfirmBtn = document.getElementById('upgradeConfirmBtn')
   const hofPhotoInput = document.getElementById('hofPhotoInput')
   const proofPhotoInput = document.getElementById('proofPhotoInput')
+  const joinedDateInput = document.getElementById('joinedDateInput')
   const bigDrop = document.getElementById('bigDrop')
   const photoPickView = document.getElementById('photoPickView')
   const photoCropView = document.getElementById('photoCropView')
@@ -1109,7 +1212,9 @@
   const cropCanvas = document.getElementById('cropCanvas')
   const zoomRange = document.getElementById('zoomRange')
 
-  const TOTAL_STEPS = 6 // 0 photo (pick+crop), 1 name, 2 district, 3 phone, 4 identifier, 5 proof photo
+  const TOTAL_STEPS = 7 // 0 photo (pick+crop), 1 name, 2 district, 3 phone, 4 identifier, 5 proof photo, 6 date joined
+  // Can't pick a future date for "date joined Vistory"
+  if (joinedDateInput) joinedDateInput.max = new Date().toISOString().slice(0, 10)
   let currentStep = 0
   let croppedPhotoBlob = null   // final cropped Hall of Fame photo, as a Blob
   let croppedPhotoUrl = null    // object URL for preview
@@ -1135,6 +1240,30 @@
   function identifierIsValid(value, board = activeBoard) {
     if (isTsBoard(board)) return /^[A-Za-z0-9]{10}$/.test(value)
     return /^[0-9]{5}$/.test(value)
+  }
+
+  // ---- Masking helpers: show a partially-hidden version of a sensitive value,
+  // e.g. in "Edit Whatsapp no. +91 92**356" style labels on the edit-request form ----
+  function maskMiddle(str, keepStart, keepEnd) {
+    if (!str) return ''
+    if (str.length <= keepStart + keepEnd) return str[0] + '*'.repeat(Math.max(2, str.length - 1))
+    const maskLen = Math.max(2, str.length - keepStart - keepEnd)
+    return str.slice(0, keepStart) + '*'.repeat(maskLen) + str.slice(str.length - keepEnd)
+  }
+
+  function maskPhone(phone) {
+    if (!phone) return ''
+    // Match the longest dial code first (e.g. +971 before +91) to avoid a shorter
+    // code accidentally matching a phone number that actually uses a longer one.
+    const dial = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length).find((c) => phone.startsWith(c.code))
+    const code = dial ? dial.code : ''
+    const rest = dial ? phone.slice(dial.code.length) : phone
+    return `${code} ${maskMiddle(rest, 2, 3)}`.trim()
+  }
+
+  function maskIdentifier(value, board = activeBoard) {
+    if (!value) return ''
+    return isTsBoard(board) ? maskMiddle(value, 2, 3) : maskMiddle(value, 2, 0)
   }
 
   function updateIdentifierFields(board) {
@@ -1554,6 +1683,16 @@
       return
     }
 
+    if (currentStep === 5) {
+      const file = proofPhotoInput.files[0]
+      if (!file || !file.type.startsWith('image/') || file.size > MAX_PROOF_PHOTO_BYTES) {
+        showError('Please choose a valid proof photo before continuing.')
+        return
+      }
+      showStep(6)
+      return
+    }
+
     showStep(Math.min(currentStep + 1, TOTAL_STEPS - 1))
   })
 
@@ -1578,9 +1717,21 @@
     const fullPhone = `${c.code}${phoneInput.value.trim()}`
     const nft = nftInput.value.trim()
     const proofPhoto = proofPhotoInput.files[0]
+    const joinedDate = joinedDateInput.value
 
     if (!name || !district || !croppedPhotoBlob || phoneInput.value.trim().length < c.min || !identifierIsValid(nft) || !proofPhoto || !proofPhoto.type.startsWith('image/') || proofPhoto.size > MAX_PROOF_PHOTO_BYTES) {
       showError('Please complete every step before submitting.')
+      return
+    }
+
+    if (!joinedDate) {
+      showStep(6)
+      showError('Please enter the date you joined Vistory.')
+      return
+    }
+    if (joinedDate > new Date().toISOString().slice(0, 10)) {
+      showStep(6)
+      showError('The date you joined Vistory can\'t be in the future.')
       return
     }
 
@@ -1617,6 +1768,7 @@
         proof_photo_url: proofPhotoUrl,
         is_upgrade: isUpgrade,
         upgrade_from_level: isUpgrade ? upgradeFromLevel : null,
+        joined_at: joinedDate,
       })
       if (insertError) {
         if (insertError.code === '23505' && !isUpgrade) {
@@ -1668,6 +1820,7 @@
   const idCardName = document.getElementById('idCardName')
   const idCardDistrict = document.getElementById('idCardDistrict')
   const idCardDate = document.getElementById('idCardDate')
+  const idCardDays = document.getElementById('idCardDays')
   const idCardLevel = document.getElementById('idCardLevel')
   const idCardCloseBtn = document.getElementById('idCardCloseBtn')
   const idCardDownloadBtn = document.getElementById('idCardDownloadBtn')
@@ -1695,21 +1848,62 @@
     return url.toString()
   }
 
-  function openIdCard(member) {
+  function openIdCard(member, withDays) {
     activeIdCardMember = member
     idCardPhoto.src = member.photo_url
     idCardPhoto.alt = member.name
     idCardName.textContent = member.name
     idCardDistrict.textContent = member.district || ''
     idCardDistrict.style.display = member.district ? '' : 'none'
-    idCardDate.textContent = formatDisplayDate(memberDisplayDate(member))
+    idCardDate.textContent = joinedLabel(member)
     idCardLevel.innerHTML = idCardLevelLabel(member.board, member.level)
     idCardStatus.textContent = ''
+
+    if (withDays) {
+      const days = daysSince(memberDisplayDate(member), new Date())
+      idCardDays.textContent = days !== null && days >= 0 ? `${days} Day${days === 1 ? '' : 's'}` : ''
+      idCardDays.style.display = idCardDays.textContent ? '' : 'none'
+    } else {
+      idCardDays.textContent = ''
+      idCardDays.style.display = 'none'
+    }
+
     idCardOverlay.classList.add('open')
 
     // reflect this card in the URL so Copy Link/Share work immediately
     window.history.replaceState(null, '', memberLinkUrl(member))
   }
+
+  // ---- ID choice modal: asks whether the ID card should include the
+  // "No. of Days" line under the date, then opens the ID card accordingly ----
+  const idChoiceOverlay = document.getElementById('idChoiceOverlay')
+  const idChoiceWithoutBtn = document.getElementById('idChoiceWithoutBtn')
+  const idChoiceWithBtn = document.getElementById('idChoiceWithBtn')
+  let pendingIdCardMember = null
+
+  function openIdChoice(member) {
+    pendingIdCardMember = member
+    idChoiceOverlay.classList.add('open')
+  }
+
+  function closeIdChoice() {
+    idChoiceOverlay.classList.remove('open')
+    pendingIdCardMember = null
+  }
+
+  idChoiceWithoutBtn.addEventListener('click', () => {
+    const member = pendingIdCardMember
+    closeIdChoice()
+    if (member) openIdCard(member, false)
+  })
+
+  idChoiceWithBtn.addEventListener('click', () => {
+    const member = pendingIdCardMember
+    closeIdChoice()
+    if (member) openIdCard(member, true)
+  })
+
+  idChoiceOverlay.addEventListener('click', (e) => { if (e.target === idChoiceOverlay) closeIdChoice() })
 
   function closeIdCard() {
     idCardOverlay.classList.remove('open')
@@ -1724,6 +1918,7 @@
   idCardOverlay.addEventListener('click', (e) => { if (e.target === idCardOverlay) closeIdCard() })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && idCardOverlay.classList.contains('open')) closeIdCard()
+    if (e.key === 'Escape' && idChoiceOverlay.classList.contains('open')) closeIdChoice()
   })
 
   function waitForPhotoReady() {
@@ -1822,15 +2017,25 @@
   const editReqCurrentPhoto = document.getElementById('editReqCurrentPhoto')
   const editReqCurrentName = document.getElementById('editReqCurrentName')
   const editReqCurrentDistrict = document.getElementById('editReqCurrentDistrict')
+  const editReqPhotoDrop = document.getElementById('editReqPhotoDrop')
   const editReqPhotoInput = document.getElementById('editReqPhotoInput')
   const editReqPhotoPreview = document.getElementById('editReqPhotoPreview')
   const editReqPhotoLabel = document.getElementById('editReqPhotoLabel')
+  const editReqRedoPhotoBtn = document.getElementById('editReqRedoPhotoBtn')
+  const editReqCropView = document.getElementById('editReqCropView')
+  const editReqCropFrame = document.getElementById('editReqCropFrame')
+  const editReqCropCanvas = document.getElementById('editReqCropCanvas')
+  const editReqZoomRange = document.getElementById('editReqZoomRange')
+  const editReqCropCancelBtn = document.getElementById('editReqCropCancelBtn')
+  const editReqCropOkBtn = document.getElementById('editReqCropOkBtn')
   const editReqNameInput = document.getElementById('editReqNameInput')
   const editReqDistrictInput = document.getElementById('editReqDistrictInput')
   const editReqPhoneInput = document.getElementById('editReqPhoneInput')
+  const editReqPhoneLabel = document.getElementById('editReqPhoneLabel')
   const editReqIdentifierLabel = document.getElementById('editReqIdentifierLabel')
   const editReqIdentifierInput = document.getElementById('editReqIdentifierInput')
   const editReqIdentifierHint = document.getElementById('editReqIdentifierHint')
+  const editReqJoinedAtInput = document.getElementById('editReqJoinedAtInput')
   const editReqError = document.getElementById('editReqError')
   const editReqCancelBtn = document.getElementById('editReqCancelBtn')
   const editReqSubmitBtn = document.getElementById('editReqSubmitBtn')
@@ -1864,17 +2069,30 @@
     editReqPhotoPreview.removeAttribute('src')
     editReqPhotoLabel.style.display = 'block'
     editReqPhotoLabel.textContent = 'Tap to choose a new photo — leave empty to keep the current one'
+    editReqRedoPhotoBtn.style.display = 'none'
+    editReqCropView.style.display = 'none'
+    editReqPhotoDrop.style.display = 'block'
 
     editReqNameInput.value = member.name || ''
     editReqDistrictInput.value = member.district || ''
 
     editReqPhoneInput.value = ''
     editReqPhoneInput.placeholder = `Enter a new number, or leave empty to keep ${member.phone ? member.phone : 'the current one'}`
+    editReqPhoneLabel.textContent = member.phone
+      ? `Edit Whatsapp no. ${maskPhone(member.phone)}`
+      : 'WhatsApp number'
 
-    editReqIdentifierLabel.textContent = identifierName(member.board)
+    const idWord = isTsBoard(member.board) ? 'ID' : 'Nft'
+    editReqIdentifierLabel.textContent = member.passport_nft
+      ? `Edit ${idWord} no. ${maskIdentifier(member.passport_nft, member.board)}`
+      : identifierName(member.board)
     editReqIdentifierInput.value = ''
     editReqIdentifierInput.placeholder = `Enter a new ${identifierName(member.board)}, or leave empty to keep ${member.passport_nft ? member.passport_nft : 'the current one'}`
     editReqIdentifierInput.maxLength = isTsBoard(member.board) ? 10 : 5
+
+    // Prefilled with the current date — leave it as it is to keep the same one
+    editReqJoinedAtInput.max = new Date().toISOString().slice(0, 10)
+    editReqJoinedAtInput.value = member.joined_at || ''
 
     editReqSubmitBtn.disabled = false
     editReqSubmitBtn.textContent = 'Submit request'
@@ -1885,6 +2103,9 @@
     editReqOverlay.classList.remove('open')
     editReqMember = null
     editReqPhotoFile = null
+    editReqCropRawImage = null
+    editReqCropView.style.display = 'none'
+    editReqPhotoDrop.style.display = 'block'
     if (editReqPhotoPreviewUrl) { URL.revokeObjectURL(editReqPhotoPreviewUrl); editReqPhotoPreviewUrl = null }
   }
 
@@ -1898,6 +2119,102 @@
   editReqCancelBtn.addEventListener('click', closeEditRequest)
   editReqSuccessOkBtn.addEventListener('click', closeEditRequest)
   editReqOverlay.addEventListener('click', (e) => { if (e.target === editReqOverlay) closeEditRequest() })
+
+  // ---- Photo adjustment (crop/zoom) for the edit-request photo — same tool used
+  // on the registration form's photo step, wired up to its own set of elements here.
+  const EDITREQ_CROP_SIZE = 260
+  const editReqCropCtx = editReqCropCanvas.getContext('2d')
+  let editReqCropRawImage = null
+  let editReqCropState = { baseScale: 1, zoom: 1, offsetX: 0, offsetY: 0 }
+  let editReqDragging = false
+  let editReqDragStart = { x: 0, y: 0, offX: 0, offY: 0 }
+
+  function editReqStartCropStage() {
+    if (!editReqCropRawImage) return
+    editReqCropState.baseScale = Math.max(
+      EDITREQ_CROP_SIZE / editReqCropRawImage.width,
+      EDITREQ_CROP_SIZE / editReqCropRawImage.height
+    )
+    editReqCropState.zoom = 1
+    editReqCropState.offsetX = 0
+    editReqCropState.offsetY = 0
+    editReqZoomRange.value = 100
+    editReqDrawCrop()
+  }
+
+  function editReqDrawCrop() {
+    if (!editReqCropRawImage) return
+    const scale = editReqCropState.baseScale * editReqCropState.zoom
+    editReqCropCtx.clearRect(0, 0, EDITREQ_CROP_SIZE, EDITREQ_CROP_SIZE)
+    editReqCropCtx.save()
+    editReqCropCtx.translate(EDITREQ_CROP_SIZE / 2 + editReqCropState.offsetX, EDITREQ_CROP_SIZE / 2 + editReqCropState.offsetY)
+    editReqCropCtx.scale(scale, scale)
+    editReqCropCtx.drawImage(editReqCropRawImage, -editReqCropRawImage.width / 2, -editReqCropRawImage.height / 2)
+    editReqCropCtx.restore()
+  }
+
+  function editReqClampOffsets() {
+    const scale = editReqCropState.baseScale * editReqCropState.zoom
+    const halfW = (editReqCropRawImage.width * scale) / 2
+    const halfH = (editReqCropRawImage.height * scale) / 2
+    const maxX = Math.max(0, halfW - EDITREQ_CROP_SIZE / 2)
+    const maxY = Math.max(0, halfH - EDITREQ_CROP_SIZE / 2)
+    editReqCropState.offsetX = Math.min(maxX, Math.max(-maxX, editReqCropState.offsetX))
+    editReqCropState.offsetY = Math.min(maxY, Math.max(-maxY, editReqCropState.offsetY))
+  }
+
+  function editReqPointerPos(e) {
+    if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    return { x: e.clientX, y: e.clientY }
+  }
+  function editReqOnDragStart(e) {
+    editReqDragging = true
+    const p = editReqPointerPos(e)
+    editReqDragStart = { x: p.x, y: p.y, offX: editReqCropState.offsetX, offY: editReqCropState.offsetY }
+  }
+  function editReqOnDragMove(e) {
+    if (!editReqDragging) return
+    const p = editReqPointerPos(e)
+    editReqCropState.offsetX = editReqDragStart.offX + (p.x - editReqDragStart.x)
+    editReqCropState.offsetY = editReqDragStart.offY + (p.y - editReqDragStart.y)
+    editReqClampOffsets()
+    editReqDrawCrop()
+  }
+  function editReqOnDragEnd() { editReqDragging = false }
+
+  editReqCropFrame.addEventListener('pointerdown', editReqOnDragStart)
+  window.addEventListener('pointermove', editReqOnDragMove)
+  window.addEventListener('pointerup', editReqOnDragEnd)
+  editReqCropFrame.addEventListener('touchstart', editReqOnDragStart, { passive: true })
+  editReqCropFrame.addEventListener('touchmove', (e) => { editReqOnDragMove(e); e.preventDefault() }, { passive: false })
+  editReqCropFrame.addEventListener('touchend', editReqOnDragEnd)
+
+  editReqZoomRange.addEventListener('input', () => {
+    editReqCropState.zoom = Number(editReqZoomRange.value) / 100
+    editReqClampOffsets()
+    editReqDrawCrop()
+  })
+
+  function editReqConfirmCrop() {
+    return new Promise((resolve, reject) => {
+      const OUTPUT_SIZE = 480
+      const out = document.createElement('canvas')
+      out.width = OUTPUT_SIZE
+      out.height = OUTPUT_SIZE
+      const octx = out.getContext('2d')
+      const factor = OUTPUT_SIZE / EDITREQ_CROP_SIZE
+      const scale = editReqCropState.baseScale * editReqCropState.zoom * factor
+      octx.save()
+      octx.translate(OUTPUT_SIZE / 2 + editReqCropState.offsetX * factor, OUTPUT_SIZE / 2 + editReqCropState.offsetY * factor)
+      octx.scale(scale, scale)
+      octx.drawImage(editReqCropRawImage, -editReqCropRawImage.width / 2, -editReqCropRawImage.height / 2)
+      octx.restore()
+      out.toBlob((blob) => {
+        if (!blob) return reject(new Error('Could not process the photo.'))
+        resolve(blob)
+      }, 'image/jpeg', 0.92)
+    })
+  }
 
   editReqPhotoInput.addEventListener('change', () => {
     const file = editReqPhotoInput.files[0]
@@ -1913,12 +2230,50 @@
       return
     }
     editReqError.style.display = 'none'
-    editReqPhotoFile = file
-    if (editReqPhotoPreviewUrl) URL.revokeObjectURL(editReqPhotoPreviewUrl)
-    editReqPhotoPreviewUrl = URL.createObjectURL(file)
-    editReqPhotoPreview.src = editReqPhotoPreviewUrl
-    editReqPhotoPreview.style.display = 'block'
-    editReqPhotoLabel.style.display = 'none'
+    const img = new Image()
+    img.onload = () => {
+      editReqCropRawImage = img
+      editReqPhotoDrop.style.display = 'none'
+      editReqRedoPhotoBtn.style.display = 'none'
+      editReqCropView.style.display = 'flex'
+      editReqStartCropStage()
+    }
+    img.onerror = () => showEditReqError('Could not read that image — please try another photo.')
+    img.src = URL.createObjectURL(file)
+  })
+
+  editReqCropCancelBtn.addEventListener('click', () => {
+    editReqCropRawImage = null
+    editReqPhotoInput.value = ''
+    editReqCropView.style.display = 'none'
+    editReqPhotoDrop.style.display = 'block'
+  })
+
+  editReqCropOkBtn.addEventListener('click', async () => {
+    try {
+      const blob = await editReqConfirmCrop()
+      editReqPhotoFile = new File([blob], 'edit-photo.jpg', { type: 'image/jpeg' })
+      if (editReqPhotoPreviewUrl) URL.revokeObjectURL(editReqPhotoPreviewUrl)
+      editReqPhotoPreviewUrl = URL.createObjectURL(editReqPhotoFile)
+      editReqPhotoPreview.src = editReqPhotoPreviewUrl
+      editReqPhotoPreview.style.display = 'block'
+      editReqPhotoLabel.style.display = 'none'
+      editReqCropView.style.display = 'none'
+      editReqPhotoDrop.style.display = 'block'
+      editReqRedoPhotoBtn.style.display = 'block'
+    } catch (err) {
+      showEditReqError(err.message || 'Could not process the photo.')
+    }
+  })
+
+  editReqRedoPhotoBtn.addEventListener('click', () => {
+    editReqPhotoFile = null
+    editReqPhotoInput.value = ''
+    if (editReqPhotoPreviewUrl) { URL.revokeObjectURL(editReqPhotoPreviewUrl); editReqPhotoPreviewUrl = null }
+    editReqPhotoPreview.style.display = 'none'
+    editReqPhotoPreview.removeAttribute('src')
+    editReqPhotoLabel.style.display = 'block'
+    editReqRedoPhotoBtn.style.display = 'none'
   })
 
   editReqForm.addEventListener('submit', async (e) => {
@@ -1936,6 +2291,7 @@
     const phone = phoneTyped || editReqMember.phone || ''
     const identifierTyped = editReqIdentifierInput.value.trim()
     const identifier = identifierTyped || editReqMember.passport_nft || ''
+    const joinedAt = editReqJoinedAtInput.value
 
     if (!name) { showEditReqError('Please enter the full name.'); return }
     if (!district) { showEditReqError('Please enter the district.'); return }
@@ -1948,12 +2304,18 @@
       showEditReqError(isTsBoard(board) ? 'Link ID must be exactly 10 characters.' : 'Passport NFT must be exactly 5 digits.')
       return
     }
+    if (!joinedAt) { showEditReqError('Please enter the date joined Vistory.'); return }
+    if (joinedAt > new Date().toISOString().slice(0, 10)) {
+      showEditReqError("The date joined Vistory can't be in the future.")
+      return
+    }
 
     const nothingChanged =
       name === (editReqMember.name || '') &&
       district === (editReqMember.district || '') &&
       phone === (editReqMember.phone || '') &&
       identifier === (editReqMember.passport_nft || '') &&
+      joinedAt === (editReqMember.joined_at || '') &&
       !editReqPhotoFile
     if (nothingChanged) { showEditReqError("You haven't changed anything yet."); return }
 
@@ -1979,6 +2341,8 @@
         new_passport_nft: identifier,
         old_photo_url: editReqMember.photo_url,
         new_photo_url: newPhotoUrl,
+        old_joined_at: editReqMember.joined_at,
+        new_joined_at: joinedAt,
       })
       if (insertError) throw insertError
 
