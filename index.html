@@ -195,10 +195,10 @@
   }
   .photo-days-badge {
     display: inline-flex; align-items: center; justify-content: center;
-    margin-top: 2px; padding: 0;
+    margin-top: 4px; padding: 2px 12px;
     font-family: var(--font-mono); font-size: 16px; font-weight: 800; letter-spacing: 0.3px; text-transform: uppercase;
-    color: #d94a2b;
-    background: none; box-shadow: none;
+    color: #d94a2b; border-radius: 999px; border: 2px solid var(--gold);
+    background: none; box-shadow: 0 0 8px rgba(232, 182, 90, 0.35);
   }
 
   /* ---- 3D-styled add button ---- */
@@ -375,7 +375,13 @@
     .idcard-actions { grid-template-columns: repeat(2, 1fr); }
   }
 
-  .idcard-days { font-family: var(--font-mono); font-weight: 700; font-size: 18px; color: #9b111e; text-shadow: 0 0 10px rgba(155,17,30,0.45); margin-top: -4px; margin-bottom: 10px; }
+  .idcard-days {
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 18px; letter-spacing: 0.3px;
+    color: #d94a2b; border-radius: 999px; border: 2px solid var(--gold); padding: 3px 16px;
+    background: none; box-shadow: 0 0 8px rgba(232, 182, 90, 0.35);
+    margin-top: 2px; margin-bottom: 10px;
+  }
 
   /* ---- ID choice modal (asks with/without No. of Days before opening the ID card) ---- */
   .idchoice-modal { max-width: 340px; text-align: center; }
