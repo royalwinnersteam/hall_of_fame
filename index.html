@@ -131,6 +131,72 @@
   .board-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
   .board-tab.active { background: var(--gold); color: #14161c; }
 
+  /* ---- Official links: button-style anchors at the bottom of the list ---- */
+  .site-links { margin-top: 36px; padding-top: 26px; border-top: 1px solid var(--line); }
+  .site-links-label {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 16px; text-align: center;
+  }
+  .site-links-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; }
+
+  .site-link-btn {
+    --btn-accent: var(--gold);
+    --btn-accent-soft: rgba(232, 182, 90, 0.25);
+    position: relative;
+    display: inline-flex; align-items: center; gap: 10px;
+    text-decoration: none; overflow: hidden;
+    font-family: var(--font-body); font-weight: 700; font-size: 15px;
+    padding: 16px 26px; border-radius: 14px;
+    color: var(--text);
+    background:
+      linear-gradient(160deg, rgba(255,255,255,0.08), transparent 40%),
+      linear-gradient(135deg, color-mix(in srgb, var(--btn-accent) 30%, #10131c) 0%, #0c0e15 65%);
+    border: 1px solid color-mix(in srgb, var(--btn-accent) 55%, #262c3a);
+    box-shadow:
+      0 6px 18px rgba(0,0,0,0.45),
+      0 0 0 1px rgba(255,255,255,0.02) inset,
+      0 1px 0 rgba(255,255,255,0.08) inset;
+    transition: transform 0.18s ease, box-shadow 0.25s ease, border-color 0.18s ease;
+  }
+  .site-link-btn::before {
+    /* subtle royal sheen sweep */
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.14) 48%, transparent 66%);
+    background-size: 220% 220%; background-position: 120% 0%;
+    transition: background-position 0.6s ease;
+    pointer-events: none;
+  }
+  .site-link-btn:hover::before, .site-link-btn:focus-visible::before { background-position: -20% 0%; }
+  .site-link-btn:hover, .site-link-btn:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--btn-accent);
+    box-shadow:
+      0 10px 26px -4px var(--btn-accent-soft),
+      0 0 0 1px color-mix(in srgb, var(--btn-accent) 40%, transparent) inset,
+      0 1px 0 rgba(255,255,255,0.12) inset;
+  }
+  .site-link-btn:active { transform: translateY(-1px); }
+
+  .site-link-icon-wrap {
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background: color-mix(in srgb, var(--btn-accent) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--btn-accent) 45%, transparent);
+    color: var(--btn-accent);
+  }
+  .site-link-text { display: flex; flex-direction: column; gap: 1px; line-height: 1.2; }
+  .site-link-name { color: var(--btn-accent); letter-spacing: 0.3px; text-shadow: 0 0 14px var(--btn-accent-soft); }
+  .site-link-url { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .site-link-icon { flex-shrink: 0; }
+
+  .site-link-btn--violet { --btn-accent: #9b6bff; --btn-accent-soft: rgba(155, 107, 255, 0.38); }
+  .site-link-btn--red    { --btn-accent: #ff5f6d; --btn-accent-soft: rgba(255, 95, 109, 0.38); }
+  .site-link-btn--blue   { --btn-accent: #4f8dff; --btn-accent-soft: rgba(79, 141, 255, 0.38); }
+
+  @media (max-width: 480px) {
+    .site-link-btn { flex: 1 1 100%; justify-content: center; }
+  }
+
   .level-list { display: flex; flex-direction: column; }
   .level-row { display: flex; align-items: center; gap: 20px; padding: 20px 4px; border-bottom: 1px solid var(--line); }
   .level-row:last-child { border-bottom: none; }
@@ -475,6 +541,42 @@
   </div>
   
   <div class="level-list" id="levelList"></div>
+
+  <div class="site-links">
+      <div class="site-links-label">Official Links</div>
+      <div class="site-links-row">
+          <a class="site-link-btn site-link-btn--violet" href="https://tactics-strategy.com" target="_blank" rel="noopener noreferrer">
+              <span class="site-link-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="currentColor"/></svg>
+              </span>
+              <span class="site-link-text">
+                <span class="site-link-name">T&amp;S</span>
+                <span class="site-link-url">tactics-strategy.com</span>
+              </span>
+              <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="site-link-btn site-link-btn--red" href="https://v-boost.top" target="_blank" rel="noopener noreferrer">
+              <span class="site-link-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="currentColor"/></svg>
+              </span>
+              <span class="site-link-text">
+                <span class="site-link-name">V-Boost</span>
+                <span class="site-link-url">v-boost.top</span>
+              </span>
+              <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="site-link-btn site-link-btn--blue" href="https://vistory.top" target="_blank" rel="noopener noreferrer">
+              <span class="site-link-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="currentColor"/></svg>
+              </span>
+              <span class="site-link-text">
+                <span class="site-link-name">Vistory</span>
+                <span class="site-link-url">vistory.top</span>
+              </span>
+              <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+      </div>
+  </div>
 
 </div>
 
