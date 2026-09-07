@@ -13,10 +13,7 @@ begin
     end loop;
 end $$;
 
--- ------------------------------------------------------------
--- REQUESTS TABLE — recreated constraints with named
--- vboost_direct / ts_direct boards added
--- ------------------------------------------------------------
+
 alter table public.requests
     drop constraint if exists requests_board_check;
 alter table public.requests
@@ -43,9 +40,6 @@ alter table public.requests
         (board in ('ts','ts_direct') and passport_nft ~ '^[A-Za-z0-9]{10}$')
     );
 
--- ------------------------------------------------------------
--- MEMBERS TABLE — same additions
--- ------------------------------------------------------------
 alter table public.members
     drop constraint if exists members_board_check;
 alter table public.members

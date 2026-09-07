@@ -1,6 +1,3 @@
--- ------------------------------------------------------------
--- REQUESTS TABLE
--- ------------------------------------------------------------
 alter table public.requests
     drop constraint if exists requests_level_check;
 alter table public.requests
@@ -11,9 +8,6 @@ alter table public.requests
         or (board in ('vboost_direct','ts_direct') and level between 0 and 30)
     );
 
--- ------------------------------------------------------------
--- MEMBERS TABLE
--- ------------------------------------------------------------
 alter table public.members
     drop constraint if exists members_level_check;
 alter table public.members
