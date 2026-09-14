@@ -533,10 +533,10 @@
       </div>
 
       <div class="board-tabs" id="boardTabs">
-          <button class="board-tab active" data-board="vboost">V-Boost Level</button>
-          <button class="board-tab" data-board="ts">T&S Level</button>
-          <button class="board-tab" data-board="vboost_direct">V-Boost Direct</button>
+          <button class="board-tab active" data-board="vboost_direct">V-Boost Direct</button>
+          <button class="board-tab" data-board="vboost">V-Boost Level</button>
           <button class="board-tab" data-board="ts_direct">T&S Direct</button>
+          <button class="board-tab" data-board="ts">T&S Level</button>
       </div>  
   </div>
   
@@ -572,6 +572,30 @@
               <span class="site-link-text">
                 <span class="site-link-name">Vistory</span>
                 <span class="site-link-url">vistory.top</span>
+              </span>
+              <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+      </div>
+
+      <div class="site-links-label" style="margin-top: 28px;">Our Team Official Links</div>
+      <div class="site-links-row">
+          <a class="site-link-btn site-link-btn--red" href="https://www.youtube.com/@vistorymetawhale" target="_blank" rel="noopener noreferrer">
+              <span class="site-link-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.95C18.25 5.6 12 5.6 12 5.6s-6.25 0-7.86.45A2.75 2.75 0 0 0 2.2 8.001 28.6 28.6 0 0 0 1.75 12a28.6 28.6 0 0 0 .45 4c.2.98.98 1.75 1.94 1.95C5.75 18.4 12 18.4 12 18.4s6.25 0 7.86-.45a2.75 2.75 0 0 0 1.94-1.95A28.6 28.6 0 0 0 22.25 12a28.6 28.6 0 0 0-.45-3.999ZM10 15V9l5.2 3-5.2 3Z" fill="currentColor"/></svg>
+              </span>
+              <span class="site-link-text">
+                <span class="site-link-name">YouTube</span>
+                <span class="site-link-url">@vistorymetawhale</span>
+              </span>
+              <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="site-link-btn site-link-btn--blue" href="https://t.me/vmetaw" target="_blank" rel="noopener noreferrer">
+              <span class="site-link-icon-wrap">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21.5 3.5 2.75 10.9c-1.15.46-1.14 1.1-.21 1.38l4.8 1.5 1.86 5.66c.22.6.38.84.78.84.32 0 .46-.14.65-.32l1.56-1.5 3.24 2.39c.6.33 1.03.16 1.18-.55l2.13-10.03c.24-.98-.31-1.44-1.24-1.03Z" fill="currentColor"/></svg>
+              </span>
+              <span class="site-link-text">
+                <span class="site-link-name">Telegram</span>
+                <span class="site-link-url">t.me/vmetaw</span>
               </span>
               <svg class="site-link-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
@@ -923,7 +947,7 @@
   const VISIBLE_SLOTS = 5 // photos are sized so exactly this many fill the row, centered between the level and the + button
   const CARD_GAP = 14 // px between photos — must match the .photo-carousel CSS gap
 
-  let currentBoard = 'vboost'
+  let currentBoard = 'vboost_direct'
   let allMembers = []         // every member row, both boards — filtered per board at render time
   let membersByLevel = {}     // { level: [member, ...] } newest first, for the currently shown board
   let activeBoard = null      // board the add-member modal is currently open for

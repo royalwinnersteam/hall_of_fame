@@ -268,10 +268,10 @@
   </div>
 
   <div class="board-tabs" id="boardTabs">
-    <button class="board-tab" data-board="vboost">V-Boost Level <span class="tab-count" id="countVboost"></span></button>
-    <button class="board-tab" data-board="ts">T&S Level <span class="tab-count" id="countTs"></span></button>
     <button class="board-tab" data-board="vboost_direct">V-Boost Direct <span class="tab-count" id="countVboostDirect"></span></button>
+    <button class="board-tab" data-board="vboost">V-Boost Level <span class="tab-count" id="countVboost"></span></button>
     <button class="board-tab" data-board="ts_direct">T&S Direct <span class="tab-count" id="countTsDirect"></span></button>
+    <button class="board-tab" data-board="ts">T&S Level <span class="tab-count" id="countTs"></span></button>
   </div>
 
   <div class="empty-state" id="emptyState">No pending requests right now.</div>
@@ -534,7 +534,7 @@
   let allRequests = []
   let allMembers = []
   let allEditRequests = []
-  let currentBoard = 'vboost'
+  let currentBoard = 'vboost_direct'
   let currentView = 'requests' // 'requests' | 'rejected' | 'members' | 'editRequests'
 
   function timeAgo(dateStr) {
