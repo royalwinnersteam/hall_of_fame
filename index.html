@@ -123,11 +123,14 @@
     white-space: nowrap;
   }
   .notice-carousel { flex: 1; min-width: 0; overflow: hidden; }
+  .notice-carousel.draggable { cursor: grab; user-select: none; }
+  .notice-carousel.draggable.dragging { cursor: grabbing; }
   .notice-track {
     display: flex; align-items: center; gap: 40px; width: max-content;
     white-space: nowrap; will-change: transform;
   }
-  .notice-block { font-family: var(--font-body); font-size: 19px; font-weight: 700; color: #2a1c05; white-space: nowrap; }
+  .notice-block { font-family: var(--font-body); font-size: 19px; font-weight: 700; color: #2a1c05; white-space: nowrap; cursor: pointer; transition: opacity 0.15s ease; }
+  .notice-block:hover { opacity: 0.72; }
   .notice-block .notice-board { color: var(--whale-navy); font-weight: 800; }
   .notice-block .notice-name { color: #7a2408; font-weight: 800; }
   .notice-empty { font-size: 17px; color: rgba(42, 28, 5, 0.65); font-style: italic; white-space: nowrap; }
@@ -251,6 +254,14 @@
   .photo-card {
     flex: 0 0 auto; width: var(--card-size);
     display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .photo-card--highlight .photo-square {
+    animation: notice-jump-highlight 2.6s ease-out;
+  }
+  @keyframes notice-jump-highlight {
+    0% { box-shadow: 0 0 0 5px rgba(232, 182, 90, 0.95), 0 6px 14px rgba(0,0,0,0.4); }
+    70% { box-shadow: 0 0 0 5px rgba(232, 182, 90, 0.55), 0 6px 14px rgba(0,0,0,0.4); }
+    100% { box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
   }
   .photo-square {
     width: var(--card-size); height: var(--card-size); border-radius: 10px; object-fit: cover;
@@ -1113,11 +1124,62 @@
   const noticeCarousel = document.getElementById('noticeCarousel')
   const noticeTrack = document.getElementById('noticeTrack')
 
+  // Clicking a block jumps down to that member's photo in its level row —
+  // switching boards first if the update belongs to the board that isn't
+  // currently selected, then scrolling to and briefly highlighting the photo.
+  noticeTrack.addEventListener('click', (e) => {
+    const block = e.target.closest('.notice-block')
+    if (!block) return
+    const { board, level, memberId } = block.dataset
+    if (!board || !level || !memberId) return
+    scrollToMemberPhoto(board, Number(level), memberId)
+  })
+
+  function scrollToMemberPhoto(board, level, memberId) {
+    if (board !== currentBoard) {
+      currentBoard = board
+      render()
+    }
+    // give the browser a frame to lay out the (possibly just-rebuilt) rows
+    // before measuring anything
+    requestAnimationFrame(() => {
+      const carousel = levelListEl.querySelector(`.photo-carousel[data-level="${level}"]`)
+      if (!carousel) return
+      const row = carousel.closest('.level-row')
+      const card = carousel.querySelector(`.photo-card[data-member-id="${CSS.escape(memberId)}"]`)
+
+      const track = carousel.querySelector('.photo-track--marquee')
+      if (track && card) {
+        // bring this exact photo into view within the carousel before scrolling
+        // the page to it, and pause the drift for a few seconds so there's time
+        // to actually see it before it goes back to drifting on its own
+        const halfWidth = track.scrollWidth / 2
+        const target = card.offsetLeft - (carousel.clientWidth - card.offsetWidth) / 2
+        const offset = ((target % halfWidth) + halfWidth) % halfWidth
+        track.style.transform = `translateX(${-offset}px)`
+        if (carousel._marqueeSeek) carousel._marqueeSeek(offset)
+        if (carousel._marqueePauseFor) carousel._marqueePauseFor(4000)
+      }
+
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (card) highlightCard(card)
+    })
+  }
+
+  function highlightCard(card) {
+    card.classList.remove('photo-card--highlight')
+    // force reflow so re-adding the class restarts the animation if the same
+    // photo is clicked again shortly after
+    void card.offsetWidth
+    card.classList.add('photo-card--highlight')
+    setTimeout(() => card.classList.remove('photo-card--highlight'), 2600)
+  }
+
   function noticeBlockHtml(m) {
     const boardName = isTsBoard(m.board) ? 'T&S' : 'V-Boost'
     const levelPart = isDirectBoard(m.board) ? `${m.level} Direct` : `Level ${m.level}`
     const districtPart = m.district ? ` from ${escapeHtml(m.district)}` : ''
-    return `<span class="notice-block"><span class="notice-board">${boardName} ${levelPart}</span>: <span class="notice-name">${escapeHtml(m.name)}</span>${districtPart}</span>`
+    return `<span class="notice-block" data-board="${escapeHtml(m.board)}" data-level="${escapeHtml(String(m.level))}" data-member-id="${escapeHtml(String(m.id))}"><span class="notice-board">${boardName} ${levelPart}</span>: <span class="notice-name">${escapeHtml(m.name)}</span>${districtPart}</span>`
   }
 
   function renderNoticeTicker() {
@@ -1126,17 +1188,22 @@
     const recent = allMembers
       .filter((m) => {
         const t = new Date(m.created_at).getTime()
-        return !isNaN(t) && t >= cutoff
+        if (isNaN(t) || t < cutoff) return false
+        // Level 0 on a Direct board is an entry point, not an achievement worth
+        // announcing — leave those out, everything else still shows as normal
+        if (isDirectBoard(m.board) && Number(m.level) === 0) return false
+        return true
       })
       // oldest first (sits leftmost), newest last (sits rightmost) — matches
       // "new blocks get added on the right" as each one is accepted
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
-    if (noticeTrack._stop) { noticeTrack._stop(); noticeTrack._stop = null }
+    if (noticeCarousel._marqueeStop) { noticeCarousel._marqueeStop(); noticeCarousel._marqueeStop = null }
 
     if (!recent.length) {
       noticeTrack.innerHTML = `<span class="notice-empty">No new updates in the last 7 days.</span>`
       noticeTrack.style.transform = 'translateX(0)'
+      noticeCarousel.classList.remove('draggable')
       return
     }
 
@@ -1144,45 +1211,10 @@
     // technique used for the 5+ photo carousels
     const doubled = [...recent, ...recent]
     noticeTrack.innerHTML = doubled.map(noticeBlockHtml).join('')
-    startNoticeMarquee()
-  }
-
-  function startNoticeMarquee() {
-    const SPEED = 40 // pixels per second
-    let offset = 0
-    let lastTime = null
-    let paused = false
-    let rafId = null
-
-    function halfWidth() { return noticeTrack.scrollWidth / 2 }
-
-    function step(t) {
-      if (lastTime === null) lastTime = t
-      const dt = (t - lastTime) / 1000
-      lastTime = t
-      if (!paused) {
-        const half = halfWidth()
-        if (half > 0) {
-          offset += SPEED * dt
-          if (offset >= half) offset -= half
-          noticeTrack.style.transform = `translateX(${-offset}px)`
-        }
-      }
-      rafId = requestAnimationFrame(step)
-    }
-
-    const onEnter = () => { paused = true }
-    const onLeave = () => { paused = false }
-    noticeCarousel.addEventListener('mouseenter', onEnter)
-    noticeCarousel.addEventListener('mouseleave', onLeave)
-
-    rafId = requestAnimationFrame(step)
-
-    noticeTrack._stop = () => {
-      if (rafId) cancelAnimationFrame(rafId)
-      noticeCarousel.removeEventListener('mouseenter', onEnter)
-      noticeCarousel.removeEventListener('mouseleave', onLeave)
-    }
+    // reuse the exact same drift/hover-pause/drag-to-scroll behavior as the
+    // photo carousels — passing VISIBLE_SLOTS as the "count" always turns on
+    // wheel + touch + mouse-drag scrolling, regardless of how many entries there are
+    startMarquee(noticeCarousel, noticeTrack, VISIBLE_SLOTS)
   }
 
   // The date shown to visitors is the date the member says they *joined the
@@ -1434,8 +1466,21 @@
 
     rafId = requestAnimationFrame(step)
 
+    carousel._marqueeSeek = (px) => {
+      const half = halfWidth()
+      if (half > 0) offset = ((px % half) + half) % half
+    }
+    carousel._marqueePauseFor = (ms) => {
+      paused = true
+      clearTimeout(carousel._pauseTimer)
+      carousel._pauseTimer = setTimeout(() => { paused = false }, ms)
+    }
+
     carousel._marqueeStop = () => {
       if (rafId) cancelAnimationFrame(rafId)
+      clearTimeout(carousel._pauseTimer)
+      carousel._marqueeSeek = null
+      carousel._marqueePauseFor = null
       carousel.removeEventListener('mouseenter', onEnter)
       carousel.removeEventListener('mouseleave', onLeave)
       if (onWheel) carousel.removeEventListener('wheel', onWheel)
