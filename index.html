@@ -108,7 +108,7 @@
   .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* ---- Notice ticker: recent adds/upgrades, auto-scrolling, sits between the
-     title and the board tabs. Entries expire out of the feed after 7 days. ---- */
+     title and the board tabs. Entries expire out of the feed after 3 days. ---- */
   .notice-bar {
     display: flex; align-items: center; gap: 16px;
     background: linear-gradient(135deg, #f4cd85 0%, var(--gold) 55%, #b9862f 100%);
@@ -138,6 +138,55 @@
     .notice-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
     .notice-label { border-right: none; padding-right: 0; }
   }
+
+  /* ---- Search: live filter across every board, results show as photo cards
+     in a panel that opens directly below the bar ---- */
+  .search-area { margin-bottom: 22px; }
+  .search-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 0 14px; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .search-bar:focus-within {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 0 3px rgba(232, 182, 90, 0.12);
+  }
+  .search-icon { color: var(--muted); flex-shrink: 0; }
+  .search-input {
+    flex: 1; min-width: 0; background: none; border: none; outline: none;
+    font-family: var(--font-body); font-size: 15px; font-weight: 600;
+    color: var(--text); padding: 13px 0;
+  }
+  .search-input::placeholder { color: var(--muted); font-weight: 500; }
+  .search-clear {
+    background: none; border: none; cursor: pointer; flex-shrink: 0;
+    color: var(--muted); font-size: 22px; line-height: 1; padding: 0 2px;
+    transition: color 0.15s ease;
+  }
+  .search-clear:hover { color: var(--gold); }
+
+  .search-results {
+    margin-top: 12px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px;
+  }
+  .search-results-count {
+    font-size: 12.5px; font-weight: 700; color: var(--muted);
+    letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .search-results-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 20px 14px;
+  }
+  .search-results-grid .photo-card { --card-size: 100%; width: 100%; cursor: pointer; }
+  .search-results-grid .photo-square { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+  .search-results-grid .photo-name,
+  .search-results-grid .photo-district { max-width: 100%; }
+  .search-result-board {
+    font-size: 11.5px; font-weight: 700; color: var(--whale-blue-light);
+    text-align: center; letter-spacing: 0.4px; margin-top: 2px;
+  }
+  .search-hit { background: rgba(232, 182, 90, 0.28); color: var(--gold); border-radius: 3px; padding: 0 1px; }
+  .search-empty { font-size: 14px; color: var(--muted); font-style: italic; text-align: center; padding: 10px 0; }
 
   /* ---- Board tabs: switch between the two lists on this one page ---- */
   .board-header{
@@ -572,6 +621,15 @@
       <div class="notice-carousel" id="noticeCarousel">
           <div class="notice-track" id="noticeTrack"></div>
       </div>
+  </div>
+
+  <div class="search-area">
+      <div class="search-bar">
+          <svg class="search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.2"/><path d="M20 20l-3.6-3.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search by name, district or passport/NFT..." autocomplete="off" />
+          <button class="search-clear" id="searchClear" aria-label="Clear search" hidden>&times;</button>
+      </div>
+      <div class="search-results" id="searchResults" hidden></div>
   </div>
 
   <div class="board-header">
@@ -1112,15 +1170,16 @@
     })
 
     renderNoticeTicker()
+    if (searchReady) runSearch()
   }
 
   // ---- "Updates" notice ticker: one scrolling line above the board tabs showing
-  // every new member added or upgraded in the last 7 days, across ALL boards (not
+  // every new member added or upgraded in the last 3 days, across ALL boards (not
   // just the one currently selected). Each accepted request — new registration or
   // upgrade alike — lands in `members` as a fresh row with its own created_at, so
   // that's the timestamp used both to order the feed and to age entries out of it.
   // No schema change needed for this — created_at already exists on every row.
-  const NOTICE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+  const NOTICE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000 // 3 days
   const noticeCarousel = document.getElementById('noticeCarousel')
   const noticeTrack = document.getElementById('noticeTrack')
 
@@ -1201,7 +1260,7 @@
     if (noticeCarousel._marqueeStop) { noticeCarousel._marqueeStop(); noticeCarousel._marqueeStop = null }
 
     if (!recent.length) {
-      noticeTrack.innerHTML = `<span class="notice-empty">No new updates in the last 7 days.</span>`
+      noticeTrack.innerHTML = `<span class="notice-empty">No new updates in the last 3 days.</span>`
       noticeTrack.style.transform = 'translateX(0)'
       noticeCarousel.classList.remove('draggable')
       return
@@ -1216,6 +1275,102 @@
     // wheel + touch + mouse-drag scrolling, regardless of how many entries there are
     startMarquee(noticeCarousel, noticeTrack, VISIBLE_SLOTS)
   }
+
+  // ---- Search: filters every member across ALL four boards by name, district
+  // or passport/NFT. Results open in a panel directly under the bar as photo
+  // cards with their details, and clicking one jumps to that member in its
+  // board row exactly like the ticker blocks do.
+  const searchInput = document.getElementById('searchInput')
+  const searchClear = document.getElementById('searchClear')
+  const searchResults = document.getElementById('searchResults')
+  // render() can fire before this point on first load, so it checks this flag
+  // before trying to refresh results against elements that aren't wired yet
+  var searchReady = false
+
+  function boardShortLabel(board) {
+    const name = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    return isDirectBoard(board) ? `${name} Direct` : `${name} Level`
+  }
+
+  // wraps every occurrence of the query in the text so the matching letters are
+  // visibly picked out in the results
+  function highlightMatch(text, query) {
+    const safe = escapeHtml(String(text ?? ''))
+    if (!query) return safe
+    const pattern = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return safe.replace(new RegExp(pattern, 'gi'), (hit) => `<span class="search-hit">${hit}</span>`)
+  }
+
+  function renderSearchCard(m, query) {
+    const dateLabel = joinedLabel(m)
+    const levelDateLabelText = levelDateCaption(m)
+    const levelPart = isDirectBoard(m.board) ? `${m.level} Direct` : `Level ${m.level}`
+    return `
+      <div class="photo-card" data-board="${escapeHtml(m.board)}" data-level="${escapeHtml(String(m.level))}" data-member-id="${escapeHtml(String(m.id))}">
+        <img class="photo-square" src="${escapeHtml(m.photo_url)}" alt="${escapeHtml(m.name)}" />
+        <div class="photo-name">${highlightMatch(m.name, query)}</div>
+        ${m.district ? `<div class="photo-district">${highlightMatch(m.district, query)}</div>` : ''}
+        <div class="search-result-board">${boardShortLabel(m.board)} &middot; ${levelPart}</div>
+        ${dateLabel ? `<div class="photo-date">${dateLabel}</div>` : ''}
+        ${levelDateLabelText ? `<div class="photo-date photo-date-level">${levelDateLabelText}</div>` : ''}
+      </div>
+    `
+  }
+
+  function runSearch() {
+    const query = searchInput.value.trim()
+    searchClear.hidden = !query
+
+    if (!query) {
+      searchResults.hidden = true
+      searchResults.innerHTML = ''
+      return
+    }
+
+    const needle = query.toLowerCase()
+    const matches = allMembers.filter((m) => {
+      return (m.name || '').toLowerCase().includes(needle)
+        || (m.district || '').toLowerCase().includes(needle)
+        || (m.passport_nft || '').toLowerCase().includes(needle)
+    })
+
+    searchResults.hidden = false
+
+    if (!matches.length) {
+      searchResults.innerHTML = `<div class="search-empty">No members found for &ldquo;${escapeHtml(query)}&rdquo;.</div>`
+      return
+    }
+
+    // group the boards together so results read in a predictable order
+    const boardOrder = ['vboost_direct', 'vboost', 'ts_direct', 'ts']
+    matches.sort((a, b) => {
+      const d = boardOrder.indexOf(a.board) - boardOrder.indexOf(b.board)
+      if (d !== 0) return d
+      return Number(b.level) - Number(a.level)
+    })
+
+    searchResults.innerHTML = `
+      <div class="search-results-count">${matches.length} result${matches.length === 1 ? '' : 's'}</div>
+      <div class="search-results-grid">${matches.map((m) => renderSearchCard(m, query)).join('')}</div>
+    `
+  }
+
+  searchInput.addEventListener('input', runSearch)
+  searchReady = true
+  searchClear.addEventListener('click', () => {
+    searchInput.value = ''
+    runSearch()
+    searchInput.focus()
+  })
+
+  // clicking a result jumps to that member in its board row, same as the ticker
+  searchResults.addEventListener('click', (e) => {
+    const card = e.target.closest('.photo-card')
+    if (!card) return
+    const { board, level, memberId } = card.dataset
+    if (!board || !level || !memberId) return
+    scrollToMemberPhoto(board, Number(level), memberId)
+  })
 
   // The date shown to visitors is the date the member says they *joined the
   // Vistory* (joined_at), entered by them on step 7 of the request form and
