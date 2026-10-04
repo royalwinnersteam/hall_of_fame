@@ -208,9 +208,10 @@
     text-shadow: 0 0 16px rgba(79, 195, 224, 0.25);
   }
 
-  .board-tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-left: 0; margin-bottom: 0; }
+  .board-tabs { display: flex; flex-wrap: wrap; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-left: 0; margin-bottom: 0; }
   .board-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
   .board-tab.active { background: var(--gold); color: #14161c; }
+  .board-header--bottom { margin-top: 28px; margin-bottom: 0; }
 
   /* ---- Official links: button-style anchors at the bottom of the list ---- */
   .site-links { margin-top: 36px; padding-top: 26px; border-top: 1px solid var(--line); }
@@ -642,10 +643,25 @@
           <button class="board-tab" data-board="vboost">V-Boost Level</button>
           <button class="board-tab" data-board="ts_direct">T&S Direct</button>
           <button class="board-tab" data-board="ts">T&S Level</button>
+          <button class="board-tab" data-board="star">Star</button>
       </div>  
   </div>
   
   <div class="level-list" id="levelList"></div>
+
+  <div class="board-header board-header--bottom">
+      <div class="board-label">
+          Members <span class="board-label-name" id="boardLabelNameBottom">in V-BOOST</span>
+      </div>
+
+      <div class="board-tabs" id="boardTabsBottom">
+          <button class="board-tab active" data-board="vboost_direct">V-Boost Direct</button>
+          <button class="board-tab" data-board="vboost">V-Boost Level</button>
+          <button class="board-tab" data-board="ts_direct">T&S Direct</button>
+          <button class="board-tab" data-board="ts">T&S Level</button>
+          <button class="board-tab" data-board="star">Star</button>
+      </div>
+  </div>
 
   <div class="site-links">
       <div class="site-links-label">Official Links</div>
@@ -1027,8 +1043,8 @@
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  const BOARD_LABELS = { vboost: 'V-Boost Level', ts: 'T&S Level', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct' }
-  const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30 }
+  const BOARD_LABELS = { vboost: 'V-Boost Level', ts: 'T&S Level', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct', star: 'Star' }
+  const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30, star: 7 }
   function levelsFor(board) {
     const n = BOARD_LEVEL_COUNTS[board]
     const levels = Array.from({ length: n }, (_, i) => n - i) // highest down to 1
@@ -1040,19 +1056,39 @@
   // just with 30 levels instead of 10/12, and their own level-tag wording.
   function isDirectBoard(board) { return board === 'vboost_direct' || board === 'ts_direct' }
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
+  // "Star" board: levels 1 Star .. 7 Star, uses the 5-digit Passport NFT like V-Boost.
+  // It's treated as part of the non-T&S group, so the same NFT may also sit on a V-Boost board.
+  function isStarBoard(board) { return board === 'star' }
+  function boardBrand(board) { return isTsBoard(board) ? 'T&S' : (isStarBoard(board) ? 'Star' : 'V-Boost') }
+  // level wording: "5 Star" / "5 Direct" / "Level 5"
+  function levelWord(board, level) {
+    if (isStarBoard(board)) return `${level} Star`
+    return isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+  }
   // Level boards and their paired Direct board (vboost <-> vboost_direct, ts <-> ts_direct)
   // are allowed to share the same NFT/ID — they're the same category, so no cross-board
   // block or upgrade prompt should happen between the two.
   function isPairedBoard(boardA, boardB) { return boardA !== boardB && isTsBoard(boardA) === isTsBoard(boardB) }
   function levelTagLabel(board, level) {
-    const boardName = isTsBoard(board) ? 'T&S' : 'V-Boost'
-    const line2 = isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+    const boardName = boardBrand(board)
+    const line2 = levelWord(board, level)
     return `<span class="level-tag-board">${boardName}</span><span class="level-tag-level">${line2}</span>`
   }
   const VISIBLE_SLOTS = 5 // photos are sized so exactly this many fill the row, centered between the level and the + button
   const CARD_GAP = 14 // px between photos — must match the .photo-carousel CSS gap
 
-  let currentBoard = 'vboost_direct'
+  const BOARD_STORAGE_KEY = 'hof_current_board'
+  function loadSavedBoard() {
+    try {
+      const saved = localStorage.getItem(BOARD_STORAGE_KEY)
+      if (saved && BOARD_LABELS[saved]) return saved
+    } catch (e) { /* storage blocked — fall back to default */ }
+    return 'vboost_direct'
+  }
+  function saveBoard(board) {
+    try { localStorage.setItem(BOARD_STORAGE_KEY, board) } catch (e) { /* ignore */ }
+  }
+  let currentBoard = loadSavedBoard()
   let allMembers = []         // every member row, both boards — filtered per board at render time
   let membersByLevel = {}     // { level: [member, ...] } newest first, for the currently shown board
   let activeBoard = null      // board the add-member modal is currently open for
@@ -1062,11 +1098,17 @@
   const headerSub = document.getElementById('headerSub')
   const boardTabs = document.getElementById('boardTabs')
 
-  boardTabs.querySelectorAll('.board-tab').forEach((tab) => {
+  const boardTabsBottom = document.getElementById('boardTabsBottom')
+  const allBoardTabs = () => document.querySelectorAll('#boardTabs .board-tab, #boardTabsBottom .board-tab')
+
+  allBoardTabs().forEach((tab) => {
     tab.addEventListener('click', () => {
       if (tab.dataset.board === currentBoard) return
+      const fromBottom = !!tab.closest('#boardTabsBottom')
       currentBoard = tab.dataset.board
       render()
+      // switched from the bottom switcher: jump back to the top of the new board's list
+      if (fromBottom) document.getElementById('boardLabel').scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   })
 
@@ -1103,10 +1145,12 @@
   const boardLabelName = document.getElementById("boardLabelName");
 
   function render() {
-    boardTabs.querySelectorAll('.board-tab').forEach((tab) => {
+    allBoardTabs().forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.board === currentBoard)
     })
+    saveBoard(currentBoard)
     boardLabelName.textContent = `in ${BOARD_LABELS[currentBoard] || currentBoard}`
+    document.getElementById('boardLabelNameBottom').textContent = boardLabelName.textContent
 
     const LEVELS = levelsFor(currentBoard)
     membersByLevel = {}
@@ -1235,8 +1279,8 @@
   }
 
   function noticeBlockHtml(m) {
-    const boardName = isTsBoard(m.board) ? 'T&S' : 'V-Boost'
-    const levelPart = isDirectBoard(m.board) ? `${m.level} Direct` : `Level ${m.level}`
+    const boardName = boardBrand(m.board)
+    const levelPart = levelWord(m.board, m.level)
     const districtPart = m.district ? ` from ${escapeHtml(m.district)}` : ''
     return `<span class="notice-block" data-board="${escapeHtml(m.board)}" data-level="${escapeHtml(String(m.level))}" data-member-id="${escapeHtml(String(m.id))}"><span class="notice-board">${boardName} ${levelPart}</span>: <span class="notice-name">${escapeHtml(m.name)}</span>${districtPart}</span>`
   }
@@ -1288,7 +1332,8 @@
   var searchReady = false
 
   function boardShortLabel(board) {
-    const name = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    if (isStarBoard(board)) return 'Star'
+    const name = boardBrand(board)
     return isDirectBoard(board) ? `${name} Direct` : `${name} Level`
   }
 
@@ -1304,7 +1349,7 @@
   function renderSearchCard(m, query) {
     const dateLabel = joinedLabel(m)
     const levelDateLabelText = levelDateCaption(m)
-    const levelPart = isDirectBoard(m.board) ? `${m.level} Direct` : `Level ${m.level}`
+    const levelPart = levelWord(m.board, m.level)
     return `
       <div class="photo-card" data-board="${escapeHtml(m.board)}" data-level="${escapeHtml(String(m.level))}" data-member-id="${escapeHtml(String(m.id))}">
         <img class="photo-square" src="${escapeHtml(m.photo_url)}" alt="${escapeHtml(m.name)}" />
@@ -1342,7 +1387,7 @@
     }
 
     // group the boards together so results read in a predictable order
-    const boardOrder = ['vboost_direct', 'vboost', 'ts_direct', 'ts']
+    const boardOrder = ['vboost_direct', 'vboost', 'ts_direct', 'ts', 'star']
     matches.sort((a, b) => {
       const d = boardOrder.indexOf(a.board) - boardOrder.indexOf(b.board)
       if (d !== 0) return d
@@ -1411,10 +1456,12 @@
   function levelDateCaption(m) {
     const dateLabel = formatDisplayDate(m.level_at)
     if (!dateLabel) return ''
-    const shortName = isTsBoard(m.board) ? 'T&S' : 'V-Boost'
-    const line = isDirectBoard(m.board)
-      ? `Reached ${shortName} ${m.level} Direct`
-      : `Unlocked ${shortName} Level ${m.level}`
+    const shortName = boardBrand(m.board)
+    const line = isStarBoard(m.board)
+      ? `Reached ${m.level} Star`
+      : isDirectBoard(m.board)
+        ? `Reached ${shortName} ${m.level} Direct`
+        : `Unlocked ${shortName} Level ${m.level}`
     return `${line} on <span class="date-value">${dateLabel}</span>`
   }
 
@@ -1806,7 +1853,8 @@
   // Text for the level-specific date field/heading, e.g.
   // "Date you unlocked V-Boost Level 5" or "Date you reached T&S 5 Direct".
   function levelDateLabelText(board, level) {
-    const shortName = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    const shortName = boardBrand(board)
+    if (isStarBoard(board)) return `Date you reached ${level} Star`
     return isDirectBoard(board)
       ? `Date you reached ${shortName} ${level} Direct`
       : `Date you unlocked ${shortName} Level ${level}`
@@ -2107,22 +2155,29 @@
   // ---- Board-specific identifier duplicate check ----
   // Looks in both the approved members table and the pending requests table so we
   // catch a number that's already on the board AND one that's already waiting for review.
+  // Prefers a row on the board currently being added to, so a number that exists on
+  // both a V-Boost board and Star is matched against the right one.
+  function pickExisting(rows) {
+    if (!rows || !rows.length) return null
+    return rows.find((r) => r.board === activeBoard) || rows[0]
+  }
+
   async function findExistingNft(nft) {
     const { data: memberRows, error: memberErr } = await supabase
       .from('members')
       .select('board, level')
       .eq('passport_nft', nft)
-      .limit(1)
     if (memberErr) throw memberErr
-    if (memberRows && memberRows.length) return memberRows[0]
+    const memberHit = pickExisting(memberRows)
+    if (memberHit) return memberHit
 
     const { data: requestRows, error: reqErr } = await supabase
       .from('requests')
       .select('board, level')
       .eq('passport_nft', nft)
-      .limit(1)
     if (reqErr) throw reqErr
-    if (requestRows && requestRows.length) return requestRows[0]
+    const requestHit = pickExisting(requestRows)
+    if (requestHit) return requestHit
 
     return null
   }
@@ -2407,8 +2462,8 @@
   let activeIdCardMember = null
 
   function idCardLevelLabel(board, level) {
-    const boardName = isTsBoard(board) ? 'T&S' : 'V-Boost'
-    const line2 = isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+    const boardName = boardBrand(board)
+    const line2 = levelWord(board, level)
     return `<span class="idcard-level-board">${boardName}</span><span class="idcard-level-value">${line2}</span>`
   }
 

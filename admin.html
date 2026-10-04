@@ -59,7 +59,7 @@
   .view-tab .tab-count { font-family: var(--font-mono); font-weight: 500; opacity: 0.85; margin-left: 6px; }
 
   /* Board tabs */
-  .board-tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
+  .board-tabs { display: flex; flex-wrap: wrap; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 24px; width: fit-content; }
   .board-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 9px 20px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
   .board-tab.active { background: var(--gold); color: #14161c; }
   .board-tab .tab-count { font-family: var(--font-mono); font-weight: 500; opacity: 0.75; margin-left: 6px; }
@@ -272,6 +272,7 @@
     <button class="board-tab" data-board="vboost">V-Boost Level <span class="tab-count" id="countVboost"></span></button>
     <button class="board-tab" data-board="ts_direct">T&S Direct <span class="tab-count" id="countTsDirect"></span></button>
     <button class="board-tab" data-board="ts">T&S Level <span class="tab-count" id="countTs"></span></button>
+    <button class="board-tab" data-board="star">Star <span class="tab-count" id="countStar"></span></button>
   </div>
 
   <div class="empty-state" id="emptyState">No pending requests right now.</div>
@@ -384,8 +385,8 @@
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  const BOARD_LABELS = { vboost: 'V-Boost', ts: 'T&S', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct' }
-  const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30 }
+  const BOARD_LABELS = { vboost: 'V-Boost', ts: 'T&S', vboost_direct: 'V-Boost Direct', ts_direct: 'T&S Direct', star: 'Star' }
+  const BOARD_LEVEL_COUNTS = { vboost: 10, ts: 12, vboost_direct: 30, ts_direct: 30, star: 7 }
   function isDirectBoard(board) { return board === 'vboost_direct' || board === 'ts_direct' }
   function levelsFor(board) {
     const n = BOARD_LEVEL_COUNTS[board]
@@ -396,6 +397,12 @@
   // "Direct" boards share their parent board's identifier format
   // (vboost_direct -> Passport NFT, ts_direct -> Link ID).
   function isTsBoard(board) { return board === 'ts' || board === 'ts_direct' }
+  // "Star" board: levels 1 Star .. 7 Star, Passport NFT identifier (non-T&S group).
+  function isStarBoard(board) { return board === 'star' }
+  function levelWord(board, level) {
+    if (isStarBoard(board)) return `${level} Star`
+    return isDirectBoard(board) ? `${level} Direct` : `Level ${level}`
+  }
   // Level boards and their paired Direct board (vboost <-> vboost_direct, ts <-> ts_direct)
   // are allowed to share the same NFT/ID — no duplicate block between the two.
   function isPairedBoard(boardA, boardB) { return boardA !== boardB && isTsBoard(boardA) === isTsBoard(boardB) }
@@ -403,6 +410,7 @@
   // "Reached T&S 5 Direct" — mirrors levelDateCaption on index.html.
   function levelDateLabelText(board, level) {
     const shortName = isTsBoard(board) ? 'T&S' : 'V-Boost'
+    if (isStarBoard(board)) return `Reached ${level} Star`
     return isDirectBoard(board)
       ? `Reached ${shortName} ${level} Direct`
       : `Unlocked ${shortName} Level ${level}`
@@ -516,7 +524,8 @@
   const countTs = document.getElementById('countTs')
   const countVboostDirect = document.getElementById('countVboostDirect')
   const countTsDirect = document.getElementById('countTsDirect')
-  const BOARD_COUNT_ELS = { vboost: countVboost, ts: countTs, vboost_direct: countVboostDirect, ts_direct: countTsDirect }
+  const countStar = document.getElementById('countStar')
+  const BOARD_COUNT_ELS = { vboost: countVboost, ts: countTs, vboost_direct: countVboostDirect, ts_direct: countTsDirect, star: countStar }
   const viewTabs = document.getElementById('viewTabs')
   const countMembers = document.getElementById('countMembers')
   const countRejected = document.getElementById('countRejected')
@@ -534,7 +543,15 @@
   let allRequests = []
   let allMembers = []
   let allEditRequests = []
-  let currentBoard = 'vboost_direct'
+  const BOARD_STORAGE_KEY = 'hof_admin_board'
+  function loadSavedBoard() {
+    try {
+      const saved = localStorage.getItem(BOARD_STORAGE_KEY)
+      if (saved && BOARD_LABELS[saved]) return saved
+    } catch (e) { /* storage blocked — fall back to default */ }
+    return 'vboost_direct'
+  }
+  let currentBoard = loadSavedBoard()
   let currentView = 'requests' // 'requests' | 'rejected' | 'members' | 'editRequests'
 
   function timeAgo(dateStr) {
@@ -686,6 +703,7 @@
   // with no click-to-expand step needed. Clicking the Hall of Fame thumbnail opens it
   // full-size in the lightbox; the proof photo is shown beside the Hall of Fame photo.
   function render() {
+    try { localStorage.setItem(BOARD_STORAGE_KEY, currentBoard) } catch (e) { /* ignore */ }
     boardTabs.querySelectorAll('.board-tab').forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.board === currentBoard)
     })
@@ -1464,7 +1482,7 @@
       levelsFor(record.board).forEach((lvl) => {
         const opt = document.createElement('option')
         opt.value = String(lvl)
-        opt.textContent = isDirectBoard(record.board) ? `${lvl} Direct` : `Level ${lvl}`
+        opt.textContent = levelWord(record.board, lvl)
         if (lvl === f.level) opt.selected = true
         editLevelInput.appendChild(opt)
       })
