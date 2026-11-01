@@ -211,6 +211,35 @@
   .board-tabs { display: flex; flex-wrap: wrap; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-left: 0; margin-bottom: 0; }
   .board-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
   .board-tab.active { background: var(--gold); color: #14161c; }
+
+  /* Inactive tabs blink slowly: the background pulses royal blue while the label
+     swaps from its name to "Page X". The open tab stays steady. All blinking tabs
+     are locked to one shared clock (see syncTabBlink in the script). */
+  .board-tab { display: inline-grid; justify-items: center; align-items: center; }
+  .board-tab .tab-name, .board-tab .tab-page { grid-area: 1 / 1; }
+  .board-tab:not(.active) { animation: tabBgBlink 5s ease-in-out infinite; }
+  .board-tab:not(.active) .tab-name { animation: tabNameBlink 5s ease-in-out infinite; }
+  .board-tab:not(.active) .tab-page { animation: tabPageBlink 5s ease-in-out infinite; color: #fff; }
+  .board-tab.active .tab-page { visibility: hidden; }
+  @keyframes tabBgBlink {
+    0%, 40% { background-color: transparent; }
+    50%, 90% { background-color: var(--royal-blue); }
+    100% { background-color: transparent; }
+  }
+  @keyframes tabNameBlink {
+    0%, 40% { opacity: 1; }
+    50%, 90% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes tabPageBlink {
+    0%, 40% { opacity: 0; }
+    50%, 90% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .board-tab:not(.active), .board-tab:not(.active) .tab-name, .board-tab:not(.active) .tab-page { animation: none; }
+    .board-tab:not(.active) .tab-page { display: none; }
+  }
   .board-header--bottom { margin-top: 28px; margin-bottom: 0; }
 
   /* ---- Official links: button-style anchors at the bottom of the list ---- */
@@ -1101,6 +1130,25 @@
   const boardTabsBottom = document.getElementById('boardTabsBottom')
   const allBoardTabs = () => document.querySelectorAll('#boardTabs .board-tab, #boardTabsBottom .board-tab')
 
+  // Pins every running tab animation to the page's timeline origin, so all blinking
+  // tabs (top and bottom rows) are always in the same phase — including right after
+  // you switch pages and a different tab starts blinking.
+  function syncTabBlink() {
+    allBoardTabs().forEach((tab) => {
+      const targets = [tab, ...tab.querySelectorAll('span')]
+      targets.forEach((el) => el.getAnimations().forEach((a) => { a.startTime = 0 }))
+    })
+  }
+
+  // Each tab shows its name and a "Page X" label stacked; CSS blinks between them
+  // on the tabs that aren't open, so the open tab stays steady.
+  document.querySelectorAll('#boardTabs, #boardTabsBottom').forEach((group) => {
+    group.querySelectorAll('.board-tab').forEach((tab, i) => {
+      const label = tab.textContent.trim()
+      tab.innerHTML = `<span class="tab-name">${label}</span><span class="tab-page">Page ${i + 1}</span>`
+    })
+  })
+
   allBoardTabs().forEach((tab) => {
     tab.addEventListener('click', () => {
       if (tab.dataset.board === currentBoard) return
@@ -1148,6 +1196,7 @@
     allBoardTabs().forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.board === currentBoard)
     })
+    syncTabBlink()
     saveBoard(currentBoard)
     boardLabelName.textContent = `in ${BOARD_LABELS[currentBoard] || currentBoard}`
     document.getElementById('boardLabelNameBottom').textContent = boardLabelName.textContent
