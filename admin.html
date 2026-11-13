@@ -53,6 +53,15 @@
   .header-sub { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   /* View tabs — switch between the pending-requests queue and the members roster */
+  .sentence-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+  .sentence-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+  .sentence-current { font-size: 15px; color: var(--gold); font-weight: 600; margin-bottom: 12px; word-break: break-word; white-space: pre-wrap; }
+  .sentence-current.empty { color: var(--muted); font-weight: 400; font-style: italic; }
+  .sentence-row { display: flex; gap: 8px; }
+  .sentence-row input { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; font-family: var(--font-body); }
+  .sentence-row input:focus { outline: 2px solid var(--gold-dim); outline-offset: 1px; }
+  .sentence-msg { font-size: 12px; margin-top: 8px; min-height: 16px; color: var(--success); }
+  .sentence-msg.error { color: var(--danger); }
   .view-tabs { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 14px; width: fit-content; }
   .view-tab { border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 9px 20px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
   .view-tab.active { background: var(--whale-blue); color: #04141c; }
@@ -260,6 +269,16 @@
     </div>
   </div>
 
+  <div class="sentence-panel">
+    <div class="sentence-label">Current sentence (added when an ID is shared)</div>
+    <div class="sentence-current empty" id="sentenceCurrent">No sentence set</div>
+    <div class="sentence-row">
+      <input type="text" id="sentenceInput" maxlength="300" placeholder="Type a new sentence…" />
+      <button class="btn btn-primary" id="sentenceSaveBtn" type="button">Save</button>
+    </div>
+    <div class="sentence-msg" id="sentenceMsg"></div>
+  </div>
+
   <div class="view-tabs" id="viewTabs">
     <button class="view-tab active" data-view="requests">Pending Requests <span class="tab-count" id="countRequests"></span></button>
     <button class="view-tab" data-view="rejected">Rejected <span class="tab-count" id="countRejected"></span></button>
@@ -448,6 +467,57 @@
 
   let realtimeChannel = null
 
+  // ---- Share sentence: shown in the WhatsApp/Share message under the member's name ----
+  const sentenceCurrent = document.getElementById('sentenceCurrent')
+  const sentenceInput = document.getElementById('sentenceInput')
+  const sentenceSaveBtn = document.getElementById('sentenceSaveBtn')
+  const sentenceMsg = document.getElementById('sentenceMsg')
+
+  function renderCurrentSentence(value) {
+    const text = (value || '').trim()
+    sentenceCurrent.textContent = text || 'No sentence set'
+    sentenceCurrent.classList.toggle('empty', !text)
+  }
+
+  async function loadShareSentence() {
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('value')
+      .eq('key', 'share_sentence')
+      .maybeSingle()
+    if (error) {
+      console.error(error)
+      sentenceMsg.className = 'sentence-msg error'
+      sentenceMsg.textContent = 'Could not load the sentence — has patch21.sql been run?'
+      return
+    }
+    renderCurrentSentence(data ? data.value : '')
+  }
+
+  async function saveShareSentence() {
+    const value = sentenceInput.value.trim()
+    sentenceSaveBtn.disabled = true
+    sentenceMsg.className = 'sentence-msg'
+    sentenceMsg.textContent = ''
+    const { error } = await supabase
+      .from('site_settings')
+      .upsert({ key: 'share_sentence', value, updated_at: new Date().toISOString() })
+    sentenceSaveBtn.disabled = false
+    if (error) {
+      console.error(error)
+      sentenceMsg.className = 'sentence-msg error'
+      sentenceMsg.textContent = `Could not save: ${error.message}`
+      return
+    }
+    renderCurrentSentence(value)   // the new sentence becomes the current sentence
+    sentenceInput.value = ''
+    sentenceMsg.textContent = value ? 'Saved ✓' : 'Sentence cleared ✓'
+    setTimeout(() => { sentenceMsg.textContent = '' }, 2500)
+  }
+
+  sentenceSaveBtn.addEventListener('click', saveShareSentence)
+  sentenceInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveShareSentence() })
+
   function showApp(session) {
     loginScreen.classList.add('hidden')
     appRoot.classList.remove('hidden')
@@ -455,6 +525,7 @@
     loadRequests()
     loadMembers()
     loadEditRequests()
+    loadShareSentence()
     if (!realtimeChannel) {
       realtimeChannel = supabase
         .channel('requests-changes')

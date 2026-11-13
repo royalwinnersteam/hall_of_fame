@@ -2516,19 +2516,103 @@
     return `<span class="idcard-level-board">${boardName}</span><span class="idcard-level-value">${line2}</span>`
   }
 
+  // ---- Clean share links ----
+  // Instead of ?board=vboost_direct&member=<long-uuid>, links look like
+  //   .../hall_of_fame/?vboost-direct=john-kumar      (first "John Kumar" on that board)
+  //   .../hall_of_fame/?vboost-direct=john-kumar-2    (second one, and so on)
+  // The key is the board title, the value is the member's name (+ number only when
+  // two people on the same board share a name). Old ?board=..&member=<id> links still work.
+  const BOARD_LINK_KEYS = {
+    vboost_direct: 'vboost-direct',
+    vboost: 'vboost-level',
+    ts_direct: 'ts-direct',
+    ts: 'ts-level',
+    star: 'star',
+  }
+  const LINK_KEY_TO_BOARD = Object.fromEntries(Object.entries(BOARD_LINK_KEYS).map(([b, k]) => [k, b]))
+
+  function slugifyName(name) {
+    const slug = String(name || '')
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g, '') // strip accents
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    return slug || 'member'
+  }
+
+  // member.id -> "john-kumar" / "john-kumar-2" (numbered by who joined first, so a
+  // person's link stays the same when newer people are added)
+  let memberSlugCache = { src: null, byId: new Map(), bySlug: new Map() }
+  function memberSlugMaps() {
+    if (memberSlugCache.src === allMembers) return memberSlugCache
+    const byId = new Map()
+    const bySlug = new Map() // "board|slug" -> member
+    const sorted = [...allMembers].sort((a, b) => {
+      const d = new Date(a.created_at) - new Date(b.created_at)
+      return d || String(a.id).localeCompare(String(b.id))
+    })
+    const counts = new Map()
+    for (const m of sorted) {
+      const base = slugifyName(m.name)
+      const key = `${m.board}|${base}`
+      const n = (counts.get(key) || 0) + 1
+      counts.set(key, n)
+      const slug = n === 1 ? base : `${base}-${n}`
+      byId.set(String(m.id), slug)
+      bySlug.set(`${m.board}|${slug}`, m)
+    }
+    memberSlugCache = { src: allMembers, byId, bySlug }
+    return memberSlugCache
+  }
+
   // Builds a link back to this page that identifies exactly this member's card,
   // so opening the link auto-shows the same photo/ID card.
   function memberLinkUrl(member) {
     const url = new URL(window.location.href)
     url.search = ''
     url.hash = ''
-    url.searchParams.set('board', member.board)
-    url.searchParams.set('member', member.id)
+    const key = BOARD_LINK_KEYS[member.board]
+    const slug = memberSlugMaps().byId.get(String(member.id))
+    if (key && slug) {
+      url.search = `?${key}=${slug}`
+    } else {
+      url.searchParams.set('board', member.board)
+      url.searchParams.set('member', member.id)
+    }
     return url.toString()
+  }
+
+  // ---- Share sentence (set in the admin site, table site_settings) ----
+  let shareSentence = ''
+  async function refreshShareSentence() {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'share_sentence')
+        .maybeSingle()
+      if (!error && data) shareSentence = (data.value || '').trim()
+    } catch (err) { console.error(err) }
+  }
+  refreshShareSentence()
+
+  // Message text when sharing an ID:
+  //   Name
+  //   <sentence from admin>   (skipped if none is set)
+  //   Royal Spark Winners Team
+  //   <link>
+  function shareMessage(member, link) {
+    const lines = [member.name]
+    if (shareSentence) lines.push(shareSentence)
+    lines.push('Royal Spark Winners Team')
+    if (link) lines.push(link)
+    return lines.join('\n')
   }
 
   function openIdCard(member, withDays) {
     activeIdCardMember = member
+    refreshShareSentence() // pick up a newly saved sentence
     idCardPhoto.src = member.photo_url
     idCardPhoto.alt = member.name
     idCardName.textContent = member.name
@@ -2593,7 +2677,8 @@
     const url = new URL(window.location.href)
     url.searchParams.delete('board')
     url.searchParams.delete('member')
-    window.history.replaceState(null, '', url.pathname + url.hash)
+    Object.keys(LINK_KEY_TO_BOARD).forEach((k) => url.searchParams.delete(k))
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
   }
 
   idCardCloseBtn.addEventListener('click', closeIdCard)
@@ -2653,18 +2738,18 @@
 
       if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
         // Native share sheet (WhatsApp, etc.) with the actual image attached
-        await navigator.share({ files: [file], title: 'Vistory', text: `${activeIdCardMember.name} — Royal Spark Winners Team\n${link}` })
+        await navigator.share({ files: [file], title: 'Vistory', text: shareMessage(activeIdCardMember, link) })
         idCardStatus.textContent = ''
         return
       }
       if (navigator.share) {
         // Some browsers support share() but not file sharing — share the link instead
-        await navigator.share({ title: 'Vistory', text: `${activeIdCardMember.name} — Royal Spark Winners Team`, url: link })
+        await navigator.share({ title: 'Vistory', text: shareMessage(activeIdCardMember, ''), url: link })
         idCardStatus.textContent = ''
         return
       }
       // Desktop fallback: open WhatsApp Web with the link pre-filled
-      window.open(`https://wa.me/?text=${encodeURIComponent(`${activeIdCardMember.name} — Royal Spark Winners Team\n${link}`)}`, '_blank')
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage(activeIdCardMember, link))}`, '_blank')
       idCardStatus.textContent = ''
     } catch (err) {
       if (err && err.name === 'AbortError') { idCardStatus.textContent = ''; return }
@@ -3054,14 +3139,28 @@
     }
   })
 
-  // If this page was opened via a shared card link (?board=..&member=..), open
-  // that member's ID card automatically once members have loaded.
+  // If this page was opened via a shared card link (?vboost-direct=john-kumar, or the
+  // old ?board=..&member=<id> form), open that member's ID card automatically once
+  // members have loaded.
   function maybeOpenSharedCardFromUrl() {
     if (idCardOverlay.classList.contains('open')) return
     const params = new URLSearchParams(window.location.search)
-    const memberId = params.get('member')
-    if (!memberId) return
-    const member = allMembers.find((m) => String(m.id) === memberId)
+    let member = null
+
+    // new clean form: ?<board-title>=<name-slug>
+    for (const [key, value] of params.entries()) {
+      const board = LINK_KEY_TO_BOARD[key]
+      if (!board) continue
+      member = memberSlugMaps().bySlug.get(`${board}|${String(value).toLowerCase()}`)
+      if (member) break
+    }
+
+    // old form: ?board=..&member=<uuid>
+    if (!member) {
+      const memberId = params.get('member')
+      if (memberId) member = allMembers.find((m) => String(m.id) === memberId)
+    }
+
     if (member) openIdCard(member)
   }
 </script>
