@@ -2713,10 +2713,6 @@
     idCardTimeout = setTimeout(() => closeIdCard(true), ID_CARD_AUTO_CLOSE_MS)
   }
 
-  // Using Download / Share / Copy Link means the visitor is busy with the card —
-  // stop the countdown so it doesn't close underneath them.
-  document.querySelector('.idcard-actions').addEventListener('click', stopIdCardTimer)
-
   function openIdCard(member, withDays, fromRoster = false) {
     activeIdCardMember = member
     idCardFromRoster = fromRoster
