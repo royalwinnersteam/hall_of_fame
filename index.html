@@ -505,6 +505,23 @@
   .idcard-close { align-self: flex-end; background: none; border: none; color: var(--muted); font-size: 24px; cursor: pointer; line-height: 1; padding: 4px 8px; }
   .idcard-close:hover { color: var(--text); }
 
+  /* Auto-close countdown: a bar that drains while the ID card is on screen */
+  .idcard-timer { width: 100%; max-width: 320px; display: none; flex-direction: column; gap: 6px; }
+  .idcard-timer-track { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .idcard-timer-fill {
+    height: 100%; width: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--whale-blue), var(--gold));
+    box-shadow: 0 0 10px rgba(232, 182, 90, 0.45);
+  }
+  .idcard-timer-text { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); text-align: center; }
+
+  /* Photo that was just viewed: stays ringed in the row until the visitor scrolls/clicks */
+  .photo-card--spotlight .photo-square {
+    box-shadow: 0 0 0 4px var(--gold), 0 0 26px rgba(232, 182, 90, 0.7);
+    transform: scale(1.06);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
   .idcard {
     width: 100%; max-width: 320px; border-radius: 20px; overflow: hidden;
     background:
@@ -904,6 +921,10 @@
   <div class="idcard-modal">
     <button type="button" class="idcard-close" id="idCardCloseBtn" aria-label="Close">&times;</button>
 
+    <div class="idcard-timer" id="idCardTimer" aria-live="off">
+      <div class="idcard-timer-track"><div class="idcard-timer-fill" id="idCardTimerFill"></div></div>
+    </div>
+
     <div class="idcard" id="idCardEl">
       <div class="idcard-header">
         <img class="idcard-logo" src="v.png" alt="V" />
@@ -1287,7 +1308,9 @@
     scrollToMemberPhoto(board, Number(level), memberId)
   })
 
-  function scrollToMemberPhoto(board, level, memberId) {
+  // opts.hold = true  ->  used after closing an ID card: the photo is centered, the
+  // drift stops and a ring stays on it until the visitor scrolls / clicks / touches.
+  function scrollToMemberPhoto(board, level, memberId, opts = {}) {
     if (board !== currentBoard) {
       currentBoard = board
       render()
@@ -1302,20 +1325,68 @@
 
       const track = carousel.querySelector('.photo-track--marquee')
       if (track && card) {
-        // bring this exact photo into view within the carousel before scrolling
-        // the page to it, and pause the drift for a few seconds so there's time
-        // to actually see it before it goes back to drifting on its own
+        // 5+ photos (spinning row): bring this exact photo to the MIDDLE of the row.
+        // Position is measured relative to the track itself, so it stays correct
+        // whatever the current drift offset is.
         const halfWidth = track.scrollWidth / 2
-        const target = card.offsetLeft - (carousel.clientWidth - card.offsetWidth) / 2
+        const cardLeftInTrack = card.getBoundingClientRect().left - track.getBoundingClientRect().left
+        const target = cardLeftInTrack - (carousel.clientWidth - card.offsetWidth) / 2
         const offset = ((target % halfWidth) + halfWidth) % halfWidth
         track.style.transform = `translateX(${-offset}px)`
         if (carousel._marqueeSeek) carousel._marqueeSeek(offset)
-        if (carousel._marqueePauseFor) carousel._marqueePauseFor(4000)
+        if (!opts.hold && carousel._marqueePauseFor) carousel._marqueePauseFor(4000)
       }
 
       if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      if (card) highlightCard(card)
+      if (opts.hold) holdSpotlight(carousel, memberId)
+      else if (card) highlightCard(card)
     })
+  }
+
+  // Keeps the viewed photo centered + ringed and the row still, until the visitor
+  // does something (scroll, wheel, click/tap, key press).
+  let releaseSpotlight = null
+  function holdSpotlight(carousel, memberId) {
+    if (releaseSpotlight) releaseSpotlight()
+
+    // both copies in a spinning row, so whichever one is in the middle gets the ring
+    const cards = [...carousel.querySelectorAll(`.photo-card[data-member-id="${CSS.escape(memberId)}"]`)]
+    cards.forEach((c) => c.classList.add('photo-card--spotlight'))
+    if (carousel._marqueeHold) carousel._marqueeHold(true)
+
+    const EVENTS = ['pointerdown', 'wheel', 'keydown', 'scroll', 'touchstart']
+    const OPTS = { capture: true, passive: true }
+    let armed = false
+    let armTimer = null
+
+    const release = () => {
+      if (!armed) return
+      cleanup()
+    }
+    function cleanup() {
+      clearTimeout(armTimer)
+      EVENTS.forEach((ev) => window.removeEventListener(ev, release, OPTS))
+      window.removeEventListener('scroll', rearm, true)
+      cards.forEach((c) => c.classList.remove('photo-card--spotlight'))
+      if (carousel._marqueeHold) carousel._marqueeHold(false)
+      if (releaseSpotlight === cleanup) releaseSpotlight = null
+    }
+    releaseSpotlight = cleanup
+
+    // Our own smooth scroll fires scroll events too — wait until it has finished
+    // (no scroll event for 200ms) before treating a scroll as the visitor's action.
+    function rearm() {
+      if (armed) return
+      clearTimeout(armTimer)
+      armTimer = setTimeout(arm, 200)
+    }
+    function arm() {
+      armed = true
+      window.removeEventListener('scroll', rearm, true)
+      EVENTS.forEach((ev) => window.addEventListener(ev, release, OPTS))
+    }
+    window.addEventListener('scroll', rearm, true)
+    rearm()
   }
 
   function highlightCard(card) {
@@ -1593,6 +1664,7 @@
     let offset = 0
     let lastTime = null
     let paused = false
+    let held = false // held still (by the "photo you just viewed" spotlight) until the visitor acts
     let rafId = null
 
     function halfWidth() {
@@ -1605,7 +1677,7 @@
       if (lastTime === null) lastTime = t
       const dt = (t - lastTime) / 1000
       lastTime = t
-      if (!paused) {
+      if (!paused && !held) {
         const half = halfWidth()
         if (half > 0) {
           offset += SPEED * dt
@@ -1721,6 +1793,7 @@
       const half = halfWidth()
       if (half > 0) offset = ((px % half) + half) % half
     }
+    carousel._marqueeHold = (v) => { held = !!v }
     carousel._marqueePauseFor = (ms) => {
       paused = true
       clearTimeout(carousel._pauseTimer)
@@ -1732,6 +1805,7 @@
       clearTimeout(carousel._pauseTimer)
       carousel._marqueeSeek = null
       carousel._marqueePauseFor = null
+      carousel._marqueeHold = null
       carousel.removeEventListener('mouseenter', onEnter)
       carousel.removeEventListener('mouseleave', onLeave)
       if (onWheel) carousel.removeEventListener('wheel', onWheel)
@@ -2610,8 +2684,42 @@
     return lines.join('\n')
   }
 
-  function openIdCard(member, withDays) {
+  // ---- Auto-close: a card opened by tapping a photo in the roster stays up for a
+  // while (with a draining bar), then closes itself and takes the visitor back to
+  // that photo in its row. Cards opened from a shared link stay until closed by hand.
+  const ID_CARD_AUTO_CLOSE_MS = 15 * 1000 // how long the card stays open (15 seconds)
+  const idCardTimerEl = document.getElementById('idCardTimer')
+  const idCardTimerFill = document.getElementById('idCardTimerFill')
+  let idCardTimeout = null
+  let idCardTick = null
+  let idCardFromRoster = false
+
+  function stopIdCardTimer() {
+    clearTimeout(idCardTimeout)
+    clearInterval(idCardTick)
+    idCardTimeout = idCardTick = null
+    idCardTimerEl.style.display = 'none'
+  }
+
+  function startIdCardTimer() {
+    stopIdCardTimer()
+    idCardTimerEl.style.display = 'flex'
+    idCardTimerFill.style.transition = 'none'
+    idCardTimerFill.style.width = '100%'
+    void idCardTimerFill.offsetWidth // reflow so the drain animation starts from full
+    idCardTimerFill.style.transition = `width ${ID_CARD_AUTO_CLOSE_MS}ms linear`
+    idCardTimerFill.style.width = '0%'
+
+    idCardTimeout = setTimeout(() => closeIdCard(true), ID_CARD_AUTO_CLOSE_MS)
+  }
+
+  // Using Download / Share / Copy Link means the visitor is busy with the card —
+  // stop the countdown so it doesn't close underneath them.
+  document.querySelector('.idcard-actions').addEventListener('click', stopIdCardTimer)
+
+  function openIdCard(member, withDays, fromRoster = false) {
     activeIdCardMember = member
+    idCardFromRoster = fromRoster
     refreshShareSentence() // pick up a newly saved sentence
     idCardPhoto.src = member.photo_url
     idCardPhoto.alt = member.name
@@ -2635,6 +2743,8 @@
     }
 
     idCardOverlay.classList.add('open')
+    if (fromRoster) startIdCardTimer()
+    else stopIdCardTimer()
 
     // reflect this card in the URL so Copy Link/Share work immediately
     window.history.replaceState(null, '', memberLinkUrl(member))
@@ -2660,18 +2770,25 @@
   idChoiceWithoutBtn.addEventListener('click', () => {
     const member = pendingIdCardMember
     closeIdChoice()
-    if (member) openIdCard(member, false)
+    if (member) openIdCard(member, false, true)
   })
 
   idChoiceWithBtn.addEventListener('click', () => {
     const member = pendingIdCardMember
     closeIdChoice()
-    if (member) openIdCard(member, true)
+    if (member) openIdCard(member, true, true)
   })
 
   idChoiceOverlay.addEventListener('click', (e) => { if (e.target === idChoiceOverlay) closeIdChoice() })
 
-  function closeIdCard() {
+  // reveal = true  ->  after closing, go back to the photo that was opened (centered in
+  // its row) and keep it ringed until the visitor scrolls or clicks. Only for cards
+  // opened from the roster; the Edit button calls this without reveal.
+  function closeIdCard(reveal = false) {
+    const member = activeIdCardMember
+    const shouldReveal = reveal === true && idCardFromRoster && member
+    stopIdCardTimer()
+    idCardFromRoster = false
     idCardOverlay.classList.remove('open')
     activeIdCardMember = null
     const url = new URL(window.location.href)
@@ -2679,12 +2796,14 @@
     url.searchParams.delete('member')
     Object.keys(LINK_KEY_TO_BOARD).forEach((k) => url.searchParams.delete(k))
     window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+
+    if (shouldReveal) scrollToMemberPhoto(member.board, Number(member.level), String(member.id), { hold: true })
   }
 
-  idCardCloseBtn.addEventListener('click', closeIdCard)
-  idCardOverlay.addEventListener('click', (e) => { if (e.target === idCardOverlay) closeIdCard() })
+  idCardCloseBtn.addEventListener('click', () => closeIdCard(true))
+  idCardOverlay.addEventListener('click', (e) => { if (e.target === idCardOverlay) closeIdCard(true) })
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && idCardOverlay.classList.contains('open')) closeIdCard()
+    if (e.key === 'Escape' && idCardOverlay.classList.contains('open')) closeIdCard(true)
     if (e.key === 'Escape' && idChoiceOverlay.classList.contains('open')) closeIdChoice()
   })
 
