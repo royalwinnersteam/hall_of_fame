@@ -2686,7 +2686,7 @@
 
   // ---- Auto-close: a card opened by tapping a photo in the roster stays up for a
   // while (with a draining bar), then closes itself and takes the visitor back to
-  // that photo in its row. Cards opened from a shared link stay until closed by hand.
+  // that photo in its row. Cards opened from a shared link behave the same way.
   const ID_CARD_AUTO_CLOSE_MS = 15 * 1000 // how long the card stays open (15 seconds)
   const idCardTimerEl = document.getElementById('idCardTimer')
   const idCardTimerFill = document.getElementById('idCardTimerFill')
@@ -3280,7 +3280,7 @@
       if (memberId) member = allMembers.find((m) => String(m.id) === memberId)
     }
 
-    if (member) openIdCard(member)
+    if (member) openIdCard(member, false, true)
   }
 </script>
 </body>
