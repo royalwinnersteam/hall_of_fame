@@ -2932,6 +2932,7 @@
   idCardDownloadBtn.addEventListener('click', async () => {
     const member = activeIdCardMember
     if (!member) return
+    stopIdCardTimer() // the visitor is using the card — stop the auto-close countdown
     idCardStatus.textContent = 'Preparing image…'
     try {
       const file = idCardFile || await idCardFilePromise
@@ -2956,6 +2957,7 @@
   idCardShareBtn.addEventListener('click', async () => {
     const member = activeIdCardMember
     if (!member) return
+    stopIdCardTimer() // keep the card open while sharing — no more auto-close
     const link = memberLinkUrl(member)
     const text = shareMessage(member, link)
 
@@ -3021,6 +3023,7 @@
   idCardCopyLinkBtn.addEventListener('click', async () => {
     const member = activeIdCardMember
     if (!member) return
+    stopIdCardTimer() // the visitor is using the card — stop the auto-close countdown
     const link = memberLinkUrl(member)
     const ok = await copyText(link)
     idCardStatus.textContent = ok ? 'Link copied ✓' : link
