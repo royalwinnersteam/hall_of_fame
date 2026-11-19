@@ -2583,6 +2583,9 @@
   const idCardStatus = document.getElementById('idCardStatus')
 
   let activeIdCardMember = null
+  let idCardPrepToken = 0        // bumps whenever the card opens/closes so stale background renders are ignored
+  let idCardFile = null          // the pre-rendered ID card image (PNG File), ready for instant share/download
+  let idCardFilePromise = null   // resolves to that file while it is still being prepared
 
   function idCardLevelLabel(board, level) {
     const boardName = boardBrand(board)
@@ -2742,6 +2745,9 @@
     if (fromRoster) startIdCardTimer()
     else stopIdCardTimer()
 
+    // build the shareable/downloadable image in the background right away
+    prepareIdCardImage(member)
+
     // reflect this card in the URL so Copy Link/Share work immediately
     window.history.replaceState(null, '', memberLinkUrl(member))
   }
@@ -2784,6 +2790,9 @@
     const member = activeIdCardMember
     const shouldReveal = reveal === true && idCardFromRoster && member
     stopIdCardTimer()
+    idCardPrepToken++
+    idCardFile = null
+    idCardFilePromise = null
     idCardFromRoster = false
     idCardOverlay.classList.remove('open')
     activeIdCardMember = null
@@ -2815,79 +2824,209 @@
     })
   }
 
+  // Fetches the member photo and turns it into a data: URL. Drawing the card from an
+  // embedded copy means html2canvas never has to re-download the photo (which could
+  // fail on a cached, non-CORS copy of the same image the roster already loaded).
+  const PHOTO_DATA_CACHE_MAX = 40
+  const photoDataUrlCache = new Map()
+  async function photoToDataUrl(url) {
+    if (photoDataUrlCache.has(url)) return photoDataUrlCache.get(url)
+    const res = await fetch(url, { mode: 'cors' })
+    if (!res.ok) throw new Error('photo fetch failed')
+    const blob = await res.blob()
+    const dataUrl = await new Promise((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result)
+      fr.onerror = () => reject(fr.error)
+      fr.readAsDataURL(blob)
+    })
+    if (photoDataUrlCache.size >= PHOTO_DATA_CACHE_MAX) photoDataUrlCache.delete(photoDataUrlCache.keys().next().value)
+    photoDataUrlCache.set(url, dataUrl)
+    return dataUrl
+  }
+
+  async function embedIdCardPhoto(member, token) {
+    await waitForPhotoReady()
+    try {
+      const dataUrl = await photoToDataUrl(member.photo_url)
+      if (token !== idCardPrepToken) return
+      if (idCardPhoto.src !== dataUrl) {
+        await new Promise((resolve) => {
+          const done = () => { idCardPhoto.removeEventListener('load', done); idCardPhoto.removeEventListener('error', done); resolve() }
+          idCardPhoto.addEventListener('load', done)
+          idCardPhoto.addEventListener('error', done)
+          idCardPhoto.src = dataUrl
+          setTimeout(done, 4000)
+        })
+      }
+    } catch (err) {
+      // not fatal — html2canvas will try the original photo URL with useCORS instead
+      console.warn('Could not embed the photo, using the original URL.', err)
+    }
+  }
+
   async function renderIdCardToCanvas() {
     if (!window.html2canvas) throw new Error('html2canvas failed to load')
     await waitForPhotoReady()
+    try { await document.fonts.ready } catch (e) { /* ignore */ }
     idCardEl.classList.add('capturing')
     try {
-      return await window.html2canvas(idCardEl, { backgroundColor: null, useCORS: true, imageTimeout: 8000, scale: 3 })
+      return await window.html2canvas(idCardEl, { backgroundColor: null, useCORS: true, imageTimeout: 8000, scale: 2 })
     } finally {
       idCardEl.classList.remove('capturing')
     }
   }
 
+  function cancelledError() {
+    const e = new Error('cancelled')
+    e.cancelled = true
+    return e
+  }
+
+  // Builds the ID card image in the background as soon as the card opens, so that
+  // when Share is tapped the image is already waiting and navigator.share() can be
+  // called instantly. (Browsers only allow the share sheet to open within a moment of
+  // the tap — rendering the image *after* the tap is what made Share fail before.)
+  function prepareIdCardImage(member) {
+    const token = ++idCardPrepToken
+    idCardFile = null
+    const promise = (async () => {
+      await new Promise((r) => setTimeout(r, 150)) // let the card finish appearing first
+      if (token !== idCardPrepToken) throw cancelledError()
+      await embedIdCardPhoto(member, token)
+      if (token !== idCardPrepToken) throw cancelledError()
+      const canvas = await renderIdCardToCanvas()
+      if (token !== idCardPrepToken) throw cancelledError()
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('Could not create the image')
+      const safeName = (member.name || 'vistory-card').trim().replace(/\s+/g, '-').replace(/[^\w\-]/g, '') || 'vistory-card'
+      const file = new File([blob], `${safeName}-vistory.png`, { type: 'image/png' })
+      if (token === idCardPrepToken) idCardFile = file
+      return file
+    })()
+    promise.catch(() => {}) // errors are handled where the file is actually needed
+    idCardFilePromise = promise
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch (err) {
+      // older / restricted browsers: fall back to a temporary textarea
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        ta.remove()
+        return ok
+      } catch (e) { return false }
+    }
+  }
+
   idCardDownloadBtn.addEventListener('click', async () => {
+    const member = activeIdCardMember
+    if (!member) return
+    stopIdCardTimer() // the visitor is using the card — stop the auto-close countdown
     idCardStatus.textContent = 'Preparing image…'
     try {
-      const canvas = await renderIdCardToCanvas()
-      const link = document.createElement('a')
-      const safeName = (activeIdCardMember?.name || 'vistory-card').trim().replace(/\s+/g, '-')
-      link.download = `${safeName}-vistory.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+      const file = idCardFile || await idCardFilePromise
+      if (!file) throw new Error('Image not ready')
+      const url = URL.createObjectURL(file)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 15000)
       idCardStatus.textContent = 'Downloaded ✓'
     } catch (err) {
+      if (err && err.cancelled) return
       console.error(err)
-      idCardStatus.textContent = `Could not create the image — try again.${err && err.message ? ` (${err.message})` : ''}`
+      if (activeIdCardMember === member) prepareIdCardImage(member) // retry in the background
+      idCardStatus.textContent = 'Could not create the image — please tap Download again.'
     }
   })
 
   idCardShareBtn.addEventListener('click', async () => {
-    if (!activeIdCardMember) return
-    const link = memberLinkUrl(activeIdCardMember)
-    idCardStatus.textContent = 'Preparing…'
-    try {
-      const canvas = await renderIdCardToCanvas()
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
-      const file = blob ? new File([blob], 'vistory-card.png', { type: 'image/png' }) : null
+    const member = activeIdCardMember
+    if (!member) return
+    stopIdCardTimer() // keep the card open while sharing — no more auto-close
+    const link = memberLinkUrl(member)
+    const text = shareMessage(member, link)
 
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        // Native share sheet (WhatsApp, etc.) with the actual image attached
-        await navigator.share({ files: [file], title: 'Vistory', text: shareMessage(activeIdCardMember, link) })
+    const shareFailedFallback = async () => {
+      const ok = await copyText(link)
+      idCardStatus.textContent = ok ? "Couldn't open share — link copied instead." : 'Could not share.'
+    }
+    const shareTextOnly = async () => {
+      try {
+        await navigator.share({ title: 'Vistory', text })
         idCardStatus.textContent = ''
+      } catch (err) {
+        if (err && err.name === 'AbortError') { idCardStatus.textContent = ''; return }
+        console.error(err)
+        await shareFailedFallback()
+      }
+    }
+
+    // Desktop browsers without a share sheet: open WhatsApp Web with the text pre-filled
+    if (!navigator.share) {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+      idCardStatus.textContent = ''
+      return
+    }
+
+    // Does this browser support sharing image files at all?
+    const probe = new File([''], 'probe.png', { type: 'image/png' })
+    const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [probe] }))
+    if (!canShareFiles) { await shareTextOnly(); return }
+
+    // The image is normally already prepared, so share opens immediately
+    let file = idCardFile
+    let waited = false
+    if (!file) {
+      waited = true
+      idCardStatus.textContent = 'Preparing image…'
+      try {
+        file = await idCardFilePromise
+      } catch (err) {
+        if (err && err.cancelled) return
+        console.error(err)
+        if (activeIdCardMember === member) prepareIdCardImage(member)
+        await shareTextOnly() // couldn't make the image — share the message + link instead
         return
       }
-      if (navigator.share) {
-        // Some browsers support share() but not file sharing — share the link instead
-        await navigator.share({ title: 'Vistory', text: shareMessage(activeIdCardMember, ''), url: link })
-        idCardStatus.textContent = ''
-        return
-      }
-      // Desktop fallback: open WhatsApp Web with the link pre-filled
-      window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage(activeIdCardMember, link))}`, '_blank')
+    }
+
+    try {
+      await navigator.share({ files: [file], title: 'Vistory', text })
       idCardStatus.textContent = ''
     } catch (err) {
       if (err && err.name === 'AbortError') { idCardStatus.textContent = ''; return }
-      console.error(err)
-      try {
-        await navigator.clipboard.writeText(link)
-        idCardStatus.textContent = "Couldn't open share — link copied instead."
-      } catch {
-        idCardStatus.textContent = 'Could not share.'
+      if (err && err.name === 'NotAllowedError' && waited) {
+        // The wait made the browser forget the tap. The image is ready now, so the next tap opens share instantly.
+        idCardStatus.textContent = 'Image is ready — tap Share again.'
+        return
       }
+      console.error(err)
+      await shareTextOnly()
     }
   })
 
   idCardCopyLinkBtn.addEventListener('click', async () => {
-    if (!activeIdCardMember) return
-    const link = memberLinkUrl(activeIdCardMember)
-    try {
-      await navigator.clipboard.writeText(link)
-      idCardStatus.textContent = 'Link copied ✓'
-    } catch (err) {
-      console.error(err)
-      idCardStatus.textContent = link
-    }
+    const member = activeIdCardMember
+    if (!member) return
+    stopIdCardTimer() // the visitor is using the card — stop the auto-close countdown
+    const link = memberLinkUrl(member)
+    const ok = await copyText(link)
+    idCardStatus.textContent = ok ? 'Link copied ✓' : link
     setTimeout(() => { if (idCardStatus.textContent === 'Link copied ✓') idCardStatus.textContent = '' }, 2500)
   })
 
